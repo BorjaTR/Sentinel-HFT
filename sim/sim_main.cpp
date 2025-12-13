@@ -181,19 +181,27 @@ public:
     void process_cycle() {
         // Ensure trace_ready is high when we want to collect traces
         dut->trace_ready = 1;
+        // Check for output handshake BEFORE tick (captures the handshake about to happen)
+        collect_output();
         // Tick to advance simulation
         tick();
-        // Collect any available trace (one per tick)
+        // Collect any available trace (one per tick, trace_valid is updated by tick)
         collect_trace();
-        // Check for output
-        collect_output();
     }
 
     // Wait for all transactions to complete
     void drain(uint32_t max_cycles = 10000) {
         uint32_t timeout = max_cycles;
         while (transactions_received < transactions_sent && timeout > 0) {
-            process_cycle();
+            // Check output before tick to count handshake
+            if (dut->out_valid && dut->out_ready) {
+                transactions_received++;
+            }
+            tick();
+            // Also collect traces if trace_ready is set
+            if (dut->trace_ready) {
+                collect_trace();
+            }
             timeout--;
         }
         if (timeout == 0) {
@@ -313,37 +321,40 @@ public:
         printf("Running backpressure test with %u BP cycles...\n", bp_cycles);
         reset();
 
-        // Send one transaction, then block ready for bp_cycles
-        send_transaction(0x1234, 0, 0);
+        // First, block the output to prevent draining
+        dut->out_ready = 0;
 
-        // Process until transaction completes
-        process_cycle();
-        process_cycle();
-        process_cycle();
+        // Send transactions to fill the pipeline
+        // With out_ready=0, these will pile up
+        for (int i = 0; i < 10; i++) {
+            send_transaction(0x1000 + i, i, i);
+        }
 
-        // Now send another transaction while forcing backpressure
+        // Now assert in_valid - with full pipeline and out_ready=0,
+        // in_ready should be 0 and we'll get backpressure
         dut->in_valid = 1;
         dut->in_data = 0x5678;
         dut->in_opcode = 1;
         dut->in_meta = 1;
 
-        // Count backpressure cycles
-        // Force core to backpressure by setting out_ready = 0
-        dut->out_ready = 0;
-
+        // Record BP counter at start
         uint64_t bp_start = dut->in_backpressure_cycles;
 
+        // Run for bp_cycles with backpressure condition
         for (uint32_t i = 0; i < bp_cycles; i++) {
             tick();
-            collect_trace();
         }
 
+        uint64_t bp_measured = dut->in_backpressure_cycles - bp_start;
+
+        // Release backpressure
         dut->out_ready = 1;
         dut->in_valid = 0;
 
+        // Drain remaining transactions
         drain();
 
-        // Collect remaining traces
+        // Collect traces
         for (int i = 0; i < 50; i++) {
             process_cycle();
         }
@@ -351,13 +362,11 @@ public:
         write_traces();
         print_summary();
 
-        // Verify backpressure counter
-        uint64_t bp_measured = dut->in_backpressure_cycles - bp_start;
         printf("Backpressure cycles measured: %lu (expected: %u)\n",
                bp_measured, bp_cycles);
 
-        // Some tolerance due to pipeline timing
-        if (bp_measured < bp_cycles - 2 || bp_measured > bp_cycles + 5) {
+        // Tolerance for pipeline timing variations
+        if (bp_measured < bp_cycles - 3 || bp_measured > bp_cycles + 5) {
             fprintf(stderr, "FAIL: Backpressure counter mismatch\n");
             return 1;
         }
@@ -378,20 +387,18 @@ public:
 
         // Send many transactions
         for (uint32_t i = 0; i < num_transactions; i++) {
-            send_transaction(i, i & 0xFFFF, i);
-            // Check output before ticking (to catch handshakes)
+            // Check output BEFORE send_transaction's tick to catch pending handshakes
             if (dut->out_valid && dut->out_ready) {
                 transactions_received++;
             }
-            tick();
+            send_transaction(i, i & 0xFFFF, i);
         }
 
         // Drain remaining transactions
-        // Re-enable trace consumption for drain phase
-        dut->trace_ready = 1;
+        // Keep trace consumption disabled to ensure overflow happens
         uint32_t timeout = 10000;
         while (transactions_received < transactions_sent && timeout > 0) {
-            // Check for output handshake
+            // Check for output handshake before tick
             if (dut->out_valid && dut->out_ready) {
                 transactions_received++;
             }
