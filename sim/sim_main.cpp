@@ -321,17 +321,16 @@ public:
         printf("Running backpressure test with %u BP cycles...\n", bp_cycles);
         reset();
 
-        // First, block the output to prevent draining
-        dut->out_ready = 0;
-
-        // Send transactions to fill the pipeline
-        // With out_ready=0, these will pile up
-        for (int i = 0; i < 10; i++) {
+        // Send transactions to fill the pipeline (with out_ready=1)
+        for (int i = 0; i < 5; i++) {
             send_transaction(0x1000 + i, i, i);
         }
 
-        // Now assert in_valid - with full pipeline and out_ready=0,
-        // in_ready should be 0 and we'll get backpressure
+        // Now block output to create backpressure
+        dut->out_ready = 0;
+
+        // Assert in_valid - with blocked output and valid in pipeline,
+        // in_ready will go low and we'll get input backpressure
         dut->in_valid = 1;
         dut->in_data = 0x5678;
         dut->in_opcode = 1;
