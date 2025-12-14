@@ -39,6 +39,10 @@ sim/obj_dir/
 sim/*.bin
 sim/*.jsonl
 
+# CLI output directories
+demo_output/
+replay_output/
+
 # IDE
 .vscode/
 .idea/
