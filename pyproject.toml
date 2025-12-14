@@ -61,7 +61,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["host*", "wind_tunnel*", "cli*", "ai*", "protocol*"]
+include = ["host*", "wind_tunnel*", "cli*", "ai*", "protocol*", "sentinel_hft*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
