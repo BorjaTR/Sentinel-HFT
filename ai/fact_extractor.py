@@ -257,3 +257,67 @@ class FactExtractor:
             return f"Bimodal latency: two populations at {pattern.details.get('low_population_mean', '?')} and {pattern.details.get('high_population_mean', '?')} cycles"
         else:
             return f"{ptype}: {affected} transactions affected"
+
+    def extract_protocol_facts(self, facts: FactSet, protocol: Any) -> None:
+        """Extract protocol-related facts (H5).
+
+        Args:
+            facts: FactSet to add facts to
+            protocol: ProtocolContext object
+        """
+        if protocol is None:
+            return
+
+        health = protocol.health
+
+        # Health score
+        importance = 'low' if health.health_tier in ('A', 'B') else 'high'
+        facts.add(Fact(
+            category='protocol',
+            key='health_tier',
+            value=health.health_tier,
+            context=f"Protocol health: {health.health_tier}-tier ({health.overall_score:.0f}/100)",
+            importance=importance,
+        ))
+
+        # Runway
+        if health.runway_months > 0:
+            importance = 'critical' if health.runway_months < 6 else 'high' if health.runway_months < 12 else 'low'
+            facts.add(Fact(
+                category='protocol',
+                key='runway',
+                value=health.runway_months,
+                context=f"Protocol runway: {health.runway_months:.0f} months (${health.treasury_usd/1e6:.1f}M treasury)",
+                importance=importance,
+            ))
+
+        # Governance
+        if health.active_proposals > 0:
+            facts.add(Fact(
+                category='protocol',
+                key='governance_active',
+                value=health.active_proposals,
+                context=f"Active governance: {health.active_proposals} proposal(s) in progress",
+                importance='high',
+            ))
+
+        # Risk flags
+        for flag in health.risk_flags:
+            facts.add(Fact(
+                category='protocol',
+                key=f'risk_flag_{flag}',
+                value=flag,
+                context=f"Protocol risk flag: {flag}",
+                importance='high',
+            ))
+
+        # Recent high-impact events
+        for event in protocol.recent_events[:3]:  # Top 3
+            if event.impact_level == 'high':
+                facts.add(Fact(
+                    category='protocol',
+                    key=f'event_{event.event_id}',
+                    value=event.to_dict(),
+                    context=f"Recent governance: {event.title}",
+                    importance='medium',
+                ))

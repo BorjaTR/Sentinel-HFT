@@ -67,3 +67,64 @@ Identify:
 4. Overall recommendation (use baseline or candidate?)
 
 Be specific with numbers."""
+
+
+# Protocol-aware prompts (H5)
+
+PROTOCOL_CONTEXT_PROMPT = """
+PROTOCOL CONTEXT:
+{protocol_summary}
+
+Financial Health:
+- Treasury: ${treasury_usd:,.0f}
+- Runway: {runway_months:.1f} months
+- Burn Rate: ${burn_rate:,.0f}/month
+
+Governance:
+- Active Proposals: {active_proposals}
+- Participation: {participation:.1%}
+- Risk Flags: {risk_flags}
+
+Recent Events:
+{recent_events}
+"""
+
+PROTOCOL_AWARE_EXPLANATION_PROMPT = """Analyze this FPGA trading system trace data WITH protocol context.
+
+{facts}
+
+{protocol_context}
+
+CONFIGURATION:
+- Clock period: {clock_period_ns}ns
+- Rate limiter: max_tokens={rate_max_tokens}, refill_rate={rate_refill_rate}/period
+- Position limits: long={pos_max_long}, short={pos_max_short}
+
+Please provide:
+1. SUMMARY (2-3 sentences on system + protocol health)
+2. KEY FINDINGS (bullet points including any protocol correlations)
+3. ROOT CAUSE ANALYSIS (consider protocol events as potential factors)
+4. RECOMMENDATIONS (include protocol-aware trading recommendations)
+
+Keep the response under 600 words. Consider how protocol health affects trading risk."""
+
+
+RISK_ASSESSMENT_PROMPT = """Provide a risk assessment for trading on this protocol.
+
+HFT SYSTEM STATUS:
+{hft_summary}
+
+PROTOCOL STATUS:
+{protocol_summary}
+
+CORRELATIONS:
+{correlations}
+
+Questions to answer:
+1. Is it safe to trade on this protocol right now?
+2. What are the key risks?
+3. What risk limits would you recommend?
+4. Any immediate actions needed?
+
+Be specific and actionable. This goes to a risk manager."""
+

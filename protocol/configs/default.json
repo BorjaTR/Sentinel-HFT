@@ -1,0 +1,34 @@
+{
+  "health": {
+    "protocol_id": "unknown",
+    "protocol_name": "Unknown Protocol",
+    "health": {
+      "overall_score": 50,
+      "tier": "C"
+    },
+    "financial": {
+      "treasury_usd": 0,
+      "runway_months": 0,
+      "burn_rate_monthly": 0
+    },
+    "governance": {
+      "active_proposals": 0,
+      "participation_rate": 0,
+      "recent_votes": 0
+    },
+    "risk": {
+      "flags": ["unknown_protocol"],
+      "level": "medium"
+    },
+    "metadata": {
+      "fetched_at": "2024-01-01T00:00:00",
+      "staleness_hours": 0
+    }
+  },
+  "recent_events": [],
+  "analysis_window": {
+    "start": "",
+    "end": ""
+  },
+  "warnings": ["Protocol data not available - using default configuration"]
+}

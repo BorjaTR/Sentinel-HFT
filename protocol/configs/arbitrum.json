@@ -1,0 +1,42 @@
+{
+  "health": {
+    "protocol_id": "arbitrum",
+    "protocol_name": "Arbitrum",
+    "health": {
+      "overall_score": 85,
+      "tier": "A"
+    },
+    "financial": {
+      "treasury_usd": 2500000000,
+      "runway_months": 48,
+      "burn_rate_monthly": 5000000
+    },
+    "governance": {
+      "active_proposals": 2,
+      "participation_rate": 0.12,
+      "recent_votes": 5
+    },
+    "risk": {
+      "flags": [],
+      "level": "low"
+    },
+    "metadata": {
+      "fetched_at": "2024-01-01T00:00:00",
+      "staleness_hours": 0
+    }
+  },
+  "recent_events": [
+    {
+      "type": "proposal_created",
+      "id": "arb-prop-42",
+      "title": "ARB Token Allocation for Ecosystem Growth",
+      "timestamp": "2024-01-15T10:00:00",
+      "impact": "medium"
+    }
+  ],
+  "analysis_window": {
+    "start": "",
+    "end": ""
+  },
+  "warnings": []
+}

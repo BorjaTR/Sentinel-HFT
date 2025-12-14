@@ -186,8 +186,27 @@ def _analyze_with_ai(args, traces, metrics, trace_file):
 
     print("Detecting patterns...")
 
+    # Load protocol context if specified
+    protocol_context = None
+    if getattr(args, 'protocol', None):
+        from protocol import ProtocolContextProvider
+        provider = ProtocolContextProvider(
+            sentinel_path=getattr(args, 'sentinel_path', None)
+        )
+        protocol_context = provider.get_context(args.protocol)
+        if protocol_context:
+            print(f"Protocol context: {protocol_context.health.protocol_name} "
+                  f"({protocol_context.health.health_tier}-tier)")
+        else:
+            print(f"Warning: Could not load protocol context for '{args.protocol}'")
+
     # Generate report (with or without AI)
-    if api_key:
+    if protocol_context:
+        print("Generating protocol-aware analysis...")
+        report = generator.generate_with_protocol(
+            traces, metrics, protocol_context, trace_file=str(trace_file)
+        )
+    elif api_key:
         print("Generating AI-powered explanation...")
         report = generator.generate(traces, metrics, trace_file=str(trace_file))
     else:
@@ -209,6 +228,14 @@ def _analyze_with_ai(args, traces, metrics, trace_file):
     print(f"\n--- Analysis Complete ---")
     print(f"Patterns detected: {report.patterns.get('patterns_detected', 0)}")
     print(f"Facts extracted: {report.facts.get('total_facts', 0)}")
+    if protocol_context:
+        print(f"Protocol context: {protocol_context.health.protocol_name}")
+        if report.correlations:
+            corr_count = len(report.correlations.get('correlated_events', []))
+            print(f"Correlations found: {corr_count}")
+        if report.risk_assessment:
+            combined = report.risk_assessment.get('combined', {})
+            print(f"Combined risk: {combined.get('risk_level', 'N/A')}")
     if report.explanation:
         print(f"AI explanation: Yes")
     else:
@@ -373,6 +400,10 @@ def main():
                                 help='Z-score threshold for anomaly detection')
     analyze_parser.add_argument('--explain', action='store_true',
                                 help='Generate AI-powered explanation (requires ANTHROPIC_API_KEY)')
+    analyze_parser.add_argument('--protocol', '-p',
+                                help='Protocol name for context (e.g., arbitrum, optimism)')
+    analyze_parser.add_argument('--sentinel-path',
+                                help='Path to Sentinel installation for live protocol data')
     analyze_parser.set_defaults(func=cmd_analyze)
 
     # convert command
