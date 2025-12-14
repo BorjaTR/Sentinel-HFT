@@ -11,6 +11,7 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -136,7 +137,11 @@ def cmd_analyze(args):
     metrics.trace_file = str(trace_file)
     metrics.trace_count = len(traces)
 
-    # Output
+    # Check if AI explanation requested
+    if args.explain:
+        return _analyze_with_ai(args, traces, metrics, trace_file)
+
+    # Standard output
     gen = ReportGenerator(title=f"Analysis: {trace_file.name}")
 
     if args.output:
@@ -155,6 +160,59 @@ def cmd_analyze(args):
             print(json.dumps(gen._build_report_dict(metrics), indent=2))
         else:
             gen.to_stdout(metrics)
+
+    return 0
+
+
+def _analyze_with_ai(args, traces, metrics, trace_file):
+    """Generate AI-enhanced analysis report."""
+    from ai import AIReportGenerator, ExplanationConfig
+
+    # Check for API key
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+
+    if not api_key:
+        print("\nWarning: ANTHROPIC_API_KEY not set. Generating report without AI explanations.")
+        print("Set the API key to enable AI-powered analysis:")
+        print("  export ANTHROPIC_API_KEY=your_key")
+        print()
+
+    # Configure AI report generator
+    config = ExplanationConfig(
+        clock_period_ns=args.clock_ns,
+    )
+
+    generator = AIReportGenerator(api_key=api_key, config=config)
+
+    print("Detecting patterns...")
+
+    # Generate report (with or without AI)
+    if api_key:
+        print("Generating AI-powered explanation...")
+        report = generator.generate(traces, metrics, trace_file=str(trace_file))
+    else:
+        report = generator.generate_without_ai(traces, metrics, trace_file=str(trace_file))
+
+    # Output report
+    if args.output:
+        output = Path(args.output)
+        fmt = 'json' if output.suffix == '.json' else 'markdown'
+        generator.save_report(report, output, format=fmt)
+        print(f"Saved: {output}")
+    else:
+        if args.format == 'json':
+            print(report.to_json())
+        else:
+            print(report.to_markdown())
+
+    # Print summary stats
+    print(f"\n--- Analysis Complete ---")
+    print(f"Patterns detected: {report.patterns.get('patterns_detected', 0)}")
+    print(f"Facts extracted: {report.facts.get('total_facts', 0)}")
+    if report.explanation:
+        print(f"AI explanation: Yes")
+    else:
+        print(f"AI explanation: No (API key not set)")
 
     return 0
 
@@ -313,6 +371,8 @@ def main():
                                 help='Clock period in nanoseconds')
     analyze_parser.add_argument('--zscore', '-z', type=float, default=3.0,
                                 help='Z-score threshold for anomaly detection')
+    analyze_parser.add_argument('--explain', action='store_true',
+                                help='Generate AI-powered explanation (requires ANTHROPIC_API_KEY)')
     analyze_parser.set_defaults(func=cmd_analyze)
 
     # convert command
