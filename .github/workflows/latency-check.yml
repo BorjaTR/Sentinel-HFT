@@ -1,0 +1,84 @@
+name: Latency Regression Check
+
+on:
+  pull_request:
+    paths:
+      - 'rtl/**'
+      - 'hdl/**'
+      - 'tests/**'
+      - 'sentinel_hft/**'
+  workflow_dispatch:
+    inputs:
+      trace_file:
+        description: 'Path to trace file'
+        required: true
+        default: 'test_traces.bin'
+      baseline_file:
+        description: 'Path to baseline JSON'
+        required: true
+        default: 'baselines/v1.0.json'
+
+jobs:
+  regression-check:
+    runs-on: ubuntu-latest
+    name: Check Latency Regression
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run FPGA Simulation
+        id: simulate
+        run: |
+          echo "::notice::Simulation would run here to generate traces"
+          # In real usage, this would run your FPGA testbench
+          # make sim TESTCASE=latency_test OUTPUT=test_traces.bin
+
+      - name: Check Latency Regression
+        id: regression
+        uses: ./.github/actions/sentinel-hft
+        with:
+          traces: ${{ github.event.inputs.trace_file || 'test_traces.bin' }}
+          baseline: ${{ github.event.inputs.baseline_file || 'baselines/v1.0.json' }}
+          max-p99-regression: '10'
+          fail-on-drops: 'true'
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const passed = '${{ steps.regression.outputs.passed }}' === 'true';
+            const current = '${{ steps.regression.outputs.p99-current }}';
+            const baseline = '${{ steps.regression.outputs.p99-baseline }}';
+            const regression = '${{ steps.regression.outputs.regression-percent }}';
+
+            const emoji = passed ? ':white_check_mark:' : ':x:';
+            const status = passed ? 'PASSED' : 'FAILED';
+
+            const body = `## ${emoji} Latency Regression Check ${status}
+
+            | Metric | Value |
+            |--------|-------|
+            | P99 Baseline | ${baseline} cycles |
+            | P99 Current | ${current} cycles |
+            | Regression | ${regression}% |
+
+            ${passed ? 'All latency metrics within acceptable bounds.' : ':warning: **Latency regression detected!**'}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Update Baseline
+        if: github.ref == 'refs/heads/main' && steps.regression.outputs.passed == 'true'
+        run: |
+          echo "::notice::Would update baseline here after merge to main"
+          # cp ${{ steps.analyze.outputs.report }} baselines/v1.0.json
+          # git add baselines/
+          # git commit -m "Update latency baseline"
+          # git push

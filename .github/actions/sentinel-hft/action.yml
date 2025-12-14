@@ -1,0 +1,135 @@
+name: 'Sentinel-HFT Regression Check'
+description: 'Check for latency regression in FPGA trading systems'
+author: 'Sentinel-HFT'
+
+branding:
+  icon: 'activity'
+  color: 'blue'
+
+inputs:
+  traces:
+    description: 'Path to current trace file'
+    required: true
+  baseline:
+    description: 'Path to baseline metrics JSON'
+    required: true
+  max-p99-regression:
+    description: 'Maximum allowed P99 regression percentage'
+    default: '10'
+  fail-on-drops:
+    description: 'Fail if traces were dropped'
+    default: 'false'
+  python-version:
+    description: 'Python version to use'
+    default: '3.11'
+
+outputs:
+  passed:
+    description: 'Whether the regression check passed'
+    value: ${{ steps.check.outputs.passed }}
+  p99-current:
+    description: 'Current P99 latency in cycles'
+    value: ${{ steps.check.outputs.p99-current }}
+  p99-baseline:
+    description: 'Baseline P99 latency in cycles'
+    value: ${{ steps.check.outputs.p99-baseline }}
+  regression-percent:
+    description: 'P99 regression percentage'
+    value: ${{ steps.check.outputs.regression-percent }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install Sentinel-HFT
+      shell: bash
+      run: |
+        pip install typer rich pyyaml
+        pip install -e ${{ github.action_path }}/../../..
+
+    - name: Analyze Traces
+      id: analyze
+      shell: bash
+      run: |
+        REPORT="${{ runner.temp }}/sentinel_report.json"
+        sentinel-hft analyze "${{ inputs.traces }}" -o "$REPORT" -q
+        echo "report=$REPORT" >> $GITHUB_OUTPUT
+
+    - name: Check Regression
+      id: check
+      shell: bash
+      run: |
+        python << 'EOF'
+        import json
+        import os
+        import sys
+
+        # Load current report
+        with open('${{ steps.analyze.outputs.report }}') as f:
+            current = json.load(f)
+
+        # Load baseline
+        with open('${{ inputs.baseline }}') as f:
+            baseline = json.load(f)
+
+        # Handle nested structure if present
+        if 'latency' not in current:
+            current = current.get('metrics', current)
+        if 'latency' not in baseline:
+            baseline = baseline.get('metrics', baseline)
+
+        # Get P99 values
+        current_p99 = current.get('latency', {}).get('p99_cycles', 0)
+        baseline_p99 = baseline.get('latency', {}).get('p99_cycles', 0)
+        current_drops = current.get('drops', {}).get('total_drops', 0)
+
+        # Calculate regression
+        if baseline_p99 > 0:
+            regression = (current_p99 - baseline_p99) / baseline_p99 * 100
+        else:
+            regression = 0 if current_p99 == 0 else 100
+
+        # Check pass/fail
+        max_regression = float('${{ inputs.max-p99-regression }}')
+        fail_on_drops = '${{ inputs.fail-on-drops }}' == 'true'
+
+        passed = regression <= max_regression
+        if fail_on_drops and current_drops > 0:
+            passed = False
+
+        # Write outputs
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write(f'passed={"true" if passed else "false"}\n')
+            f.write(f'p99-current={current_p99}\n')
+            f.write(f'p99-baseline={baseline_p99}\n')
+            f.write(f'regression-percent={regression:.2f}\n')
+
+        # Print summary
+        print(f"::group::Regression Summary")
+        print(f"P99 Baseline: {baseline_p99} cycles")
+        print(f"P99 Current:  {current_p99} cycles")
+        print(f"Regression:   {regression:+.1f}%")
+        if current_drops > 0:
+            print(f"Drops:        {current_drops}")
+        print(f"Max Allowed:  {max_regression}%")
+        print(f"Result:       {'PASS' if passed else 'FAIL'}")
+        print("::endgroup::")
+
+        if not passed:
+            print(f"::error::Regression check failed: P99 {regression:+.1f}% (max {max_regression}%)")
+            sys.exit(1)
+        else:
+            print(f"::notice::Regression check passed: P99 {regression:+.1f}%")
+        EOF
+
+    - name: Upload Report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: sentinel-hft-report
+        path: ${{ steps.analyze.outputs.report }}
+        retention-days: 30

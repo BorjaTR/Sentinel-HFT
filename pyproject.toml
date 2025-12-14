@@ -1,7 +1,7 @@
 [project]
 name = "sentinel-hft"
-version = "1.0.0"
-description = "Hardware execution observability for crypto trading infrastructure"
+version = "2.2.0"
+description = "Latency verification and regression testing for FPGA trading systems"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
@@ -12,10 +12,11 @@ keywords = [
     "fpga",
     "hft",
     "trading",
+    "latency",
+    "verification",
     "observability",
     "rtl",
     "hardware",
-    "replay",
     "metrics",
 ]
 classifiers = [
@@ -30,9 +31,21 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.24.0",
+    "pyyaml>=6.0",
+    "typer>=0.9.0",
+    "rich>=13.0.0",
 ]
 
 [project.optional-dependencies]
+api = [
+    "flask>=3.0.0",
+]
+prometheus = [
+    "prometheus-client>=0.17.0",
+]
+slack = [
+    "requests>=2.31.0",
+]
 ai = [
     "anthropic>=0.18.0",
 ]
@@ -43,11 +56,11 @@ dev = [
     "ruff>=0.1.0",
 ]
 all = [
-    "sentinel-hft[ai,dev]",
+    "sentinel-hft[api,prometheus,slack,ai,dev]",
 ]
 
 [project.scripts]
-sentinel-hft = "cli.main:main"
+sentinel-hft = "sentinel_hft.cli.main:main"
 
 [project.urls]
 Homepage = "https://github.com/BorjaTR/Sentinel-HFT"
