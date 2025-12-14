@@ -13,11 +13,21 @@ package trace_pkg;
   localparam int META_WIDTH        = 32;
 
   // Flag bit definitions
+  // Bits 0-7:  Core/trace flags
+  // Bits 8-15: Risk control flags (from risk_pkg.sv)
   typedef enum logic [15:0] {
     FLAG_NONE           = 16'h0000,
+    // Core flags (bits 0-7)
     FLAG_TRACE_DROPPED  = 16'h0001,
     FLAG_CORE_ERROR     = 16'h0002,
     FLAG_INFLIGHT_UNDER = 16'h0004,
+    // Risk flags (bits 8-15)
+    FLAG_RISK_RATE_LIMITED   = 16'h0100,
+    FLAG_RISK_POSITION_LIMIT = 16'h0200,
+    FLAG_RISK_NOTIONAL_LIMIT = 16'h0400,
+    FLAG_RISK_KILL_SWITCH    = 16'h0800,
+    FLAG_RISK_REJECTED       = 16'h1000,
+    // Reserved
     FLAG_RESERVED       = 16'h8000
   } trace_flags_e;
 
