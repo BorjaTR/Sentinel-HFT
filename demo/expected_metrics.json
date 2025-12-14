@@ -1,0 +1,30 @@
+{
+  "metadata": {
+    "trace_count": 1000,
+    "trace_drops": 0,
+    "trace_file": "demo_output/traces.bin"
+  },
+  "latency": {
+    "count": 1000,
+    "min_cycles": 2,
+    "max_cycles": 8,
+    "mean_cycles": 2.5,
+    "p50_cycles": 2,
+    "p99_cycles": 5,
+    "p999_cycles": 8
+  },
+  "anomalies": {
+    "count": 5,
+    "threshold_zscore": 3.0
+  },
+  "patterns": {
+    "detected": ["RATE_LIMIT_BURST"],
+    "burst_start_tx": 450,
+    "burst_end_tx": 550
+  },
+  "risk": {
+    "rate_limit_rejects": 0,
+    "position_limit_rejects": 0,
+    "kill_switch_triggered": false
+  }
+}

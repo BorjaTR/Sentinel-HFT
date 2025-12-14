@@ -1,127 +1,206 @@
 # Sentinel-HFT
 
-Hardware execution observability for crypto trading infrastructure.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## What Is This?
+**Hardware execution observability for crypto trading infrastructure.**
 
-Sentinel-HFT is a **deterministic replay and latency analysis tool** for FPGA-based trading systems. It wraps your RTL cores with instrumentation, captures cycle-accurate traces, and generates reports explaining latency behavior.
-
-Think of it as **"Datadog for FPGA trading systems"** - but deterministic, hardware-aware, and designed for the specific needs of high-frequency crypto trading.
+Sentinel-HFT wraps your FPGA trading cores with instrumentation, captures cycle-accurate traces, enforces risk controls, and generates AI-powered latency analysis reports.
 
 ## Features
 
-- **Non-invasive instrumentation** - Wrap any streaming RTL core without changing its behavior
-- **Cycle-accurate traces** - Know exactly when each transaction entered and exited
-- **Deterministic replay** - Same input produces identical output every time
-- **Graceful overflow** - Never blocks the data pipeline, drops traces cleanly
-- **Comprehensive metrics** - Latency distributions, percentiles, error counts
+- **Cycle-accurate instrumentation** - Non-invasive RTL wrapper captures every transaction
+- **Latency analysis** - P50/P95/P99/P99.9 distributions with anomaly detection
+- **Risk controls** - Rate limiter, position limits, kill switch in hardware
+- **AI explanations** - Natural language root cause analysis using Claude
+- **Protocol context** - Integrate DeFi protocol health data for unified risk assessment
 
 ## Quick Start
 
-### Prerequisites
+```bash
+# Install
+pip install -e .
 
-- Verilator 5.0+ (`apt install verilator`)
-- Python 3.10+
-- NumPy (`pip install numpy`)
+# Run demo
+sentinel-hft demo
 
-### Build and Test
+# Analyze your data
+sentinel-hft replay market_data.csv -o report.json
+
+# With AI explanation
+export ANTHROPIC_API_KEY=your_key
+sentinel-hft analyze traces.bin --explain --protocol arbitrum
+```
+
+## Installation
+
+### From Source
 
 ```bash
-# Clone the repository
-git clone https://github.com/you/sentinel-hft
-cd sentinel-hft
-
-# Install Python dependencies
+git clone https://github.com/BorjaTR/Sentinel-HFT
+cd Sentinel-HFT
 pip install -e ".[dev]"
 
-# Build the simulation
+# Build simulations (requires Verilator)
 make build
-
-# Run all tests
-make test
-
-# Run a quick simulation
-make run
 ```
 
-### Decode Traces
+### Docker
 
 ```bash
-# Run simulation and generate traces
-./sim/obj_dir/Vtb_sentinel_shell --test latency --num-tx 100 --output traces.bin
-
-# Decode to JSON Lines
-python host/trace_decode.py traces.bin > traces.jsonl
-
-# Compute metrics
-python host/metrics.py traces.jsonl
+docker build -t sentinel-hft .
+docker run sentinel-hft demo
 ```
 
-## Project Status
+## Usage
 
-- [x] **H1: Instrumentation Shell** - RTL wrapper + traces + tests
-- [ ] H2: Replay Harness - Python replay + metrics pipeline
-- [ ] H3: Risk Limiter - Real HFT primitive for credibility
-- [ ] H4: AI Explainer - Natural language latency reports
-- [ ] H5: Protocol Context - Integrate protocol health analysis
-- [ ] H6: Packaging - CLI, Docker, documentation
+### Replay Market Data
+
+```bash
+sentinel-hft replay market_data.csv \
+    --output report.json \
+    --latency 2
+```
+
+### Analyze Traces
+
+```bash
+sentinel-hft analyze traces.bin \
+    --explain \
+    --protocol arbitrum \
+    --format markdown
+```
+
+### Validate Traces
+
+```bash
+sentinel-hft validate traces.bin --strict
+```
 
 ## Architecture
 
 ```
-Input → [Sentinel Shell + Core] → Output
-              ↓
-         Trace Stream → [Decode] → [Metrics] → [Report]
+Input -> [Sentinel Shell + Risk Gate + Core] -> Output
+                      |
+                 Trace Stream
+                      |
+         [Decode] -> [Metrics] -> [AI Explainer] -> Report
 ```
 
-The Sentinel Shell wraps your RTL core and captures:
-- Transaction IDs (monotonic)
-- Ingress/egress timestamps (cycle-accurate)
-- Operation codes and metadata
-- Error flags
+### Components
 
-## Repository Structure
+| Component | Description |
+|-----------|-------------|
+| Sentinel Shell | Non-invasive RTL instrumentation wrapper |
+| Risk Gate | Rate limiter, position limits, kill switch |
+| Wind Tunnel | Replay harness and metrics pipeline |
+| AI Explainer | Pattern detection and LLM-powered explanations |
+| Protocol Context | DeFi protocol health integration |
+
+## Project Status
+
+- [x] **H1: Instrumentation Shell** - RTL wrapper + traces + tests
+- [x] **H2: Replay Harness** - Python replay + metrics pipeline
+- [x] **H3: Risk Controls** - Rate limiter, position limits, kill switch
+- [x] **H4: AI Explainer** - Natural language latency reports
+- [x] **H5: Protocol Context** - Integrate protocol health analysis
+- [x] **H6: Packaging** - CLI, Docker, documentation
+
+## Example Output
+
+```markdown
+# Sentinel-HFT Analysis Report
+
+## Executive Summary
+
+Trading system healthy on Arbitrum (A-tier, 48mo runway).
+P99 latency: 3 cycles (30ns). One rate limit burst detected.
+
+## Key Findings
+
+- Median latency stable at 2 cycles (20ns)
+- Rate limit burst at cycle 45,000 (12 rejections)
+- No position limit breaches
+- Kill switch not triggered
+
+## Recommendations
+
+- Increase max_tokens from 10 to 25 for burst absorption
+- Current risk limits are appropriate
+```
+
+## Project Structure
 
 ```
-sentinel-hft/
-├── rtl/                    # SystemVerilog RTL
-│   ├── trace_pkg.sv        # Trace record types
-│   ├── sync_fifo.sv        # Generic FIFO
-│   ├── sentinel_shell.sv   # Instrumentation wrapper
-│   └── stub_latency_core.sv # Test core
-├── host/                   # Python tools
-│   ├── trace_decode.py     # Binary → JSONL decoder
-│   └── metrics.py          # Latency statistics
-├── sim/                    # Simulation
-│   ├── tb_sentinel_shell.sv # Testbench wrapper
-│   ├── sim_main.cpp        # C++ test driver
-│   └── Makefile            # Verilator build
-├── tests/                  # Pytest test suite
-│   ├── test_h1_stub_latency.py
-│   ├── test_h1_determinism.py
-│   ├── test_h1_backpressure.py
-│   ├── test_h1_overflow.py
-│   └── test_h1_functional_equivalence.py
-├── docs/                   # Documentation
-│   └── H1_instrumentation_shell.md
-├── pyproject.toml          # Python package config
-├── Makefile                # Top-level build
-└── README.md
+Sentinel-HFT/
+├── rtl/                 # SystemVerilog RTL
+│   ├── sentinel_shell.sv    # Instrumentation wrapper
+│   ├── risk_gate.sv         # Risk control module
+│   ├── rate_limiter.sv      # Token bucket rate limiter
+│   ├── position_tracker.sv  # Position limit tracking
+│   └── kill_switch.sv       # Emergency stop
+├── host/                # Python host utilities
+│   ├── metrics.py           # Metrics computation
+│   ├── report.py            # Report generation
+│   └── trace_decode.py      # Trace decoding
+├── ai/                  # AI analysis
+│   ├── pattern_detector.py  # Latency pattern detection
+│   ├── explainer.py         # LLM explanation generator
+│   └── report_generator.py  # AI-enhanced reports
+├── protocol/            # Protocol integration
+│   ├── context.py           # Protocol context provider
+│   ├── health.py            # Health integration
+│   └── risk_correlation.py  # Risk correlation
+├── wind_tunnel/         # Replay infrastructure
+│   ├── replay.py            # Replay runner
+│   └── pipeline.py          # Trace pipeline
+├── cli/                 # Command-line interface
+│   └── main.py              # CLI entry point
+├── sim/                 # Verilator simulation
+│   └── Makefile             # Build configuration
+├── tests/               # Test suite
+└── demo/                # Demo data
+```
+
+## Documentation
+
+- [Installation Guide](docs/INSTALL.md)
+- [CLI Reference](docs/USAGE.md)
+- [Architecture](docs/ARCHITECTURE.md)
+
+## Development
+
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+make test
+
+# Lint
+make lint
+
+# Build simulation
+make build
 ```
 
 ## Key Commands
 
 ```bash
-# Build with specific latency
-make build-latency-7
+# Build RTL simulation
+make build
 
-# Run specific test suite
-make test-latency
-make test-determinism
-make test-overflow
+# Run all tests
+make test
 
-# Lint code
-make lint
+# Run Python tests only
+make test-python
+
+# Run RTL tests only
+make test-rtl
+
+# Run demo
+make demo
 
 # Clean build artifacts
 make clean
@@ -129,16 +208,14 @@ make clean
 
 ## Trace Record Format
 
-Each trace record is 32 bytes:
+Each trace record is 22 bytes:
 
 | Field | Size | Description |
 |-------|------|-------------|
-| tx_id | 8B | Transaction ID |
+| tx_id | 4B | Transaction ID |
 | t_ingress | 8B | Ingress cycle |
 | t_egress | 8B | Egress cycle |
 | flags | 2B | Status flags |
-| opcode | 2B | Operation code |
-| meta | 4B | User metadata |
 
 ## Who Is This For?
 
@@ -147,10 +224,6 @@ Each trace record is 32 bytes:
 - **L2 sequencers** - Analyze sequencer performance
 - **FPGA engineers** - Verify RTL timing behavior
 
-## Documentation
-
-- [H1: Instrumentation Shell](docs/H1_instrumentation_shell.md) - Detailed H1 specification
-
 ## License
 
 MIT
@@ -158,3 +231,9 @@ MIT
 ## Contributing
 
 Contributions welcome! Please read the documentation first, then open issues or PRs.
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `make test`
+5. Submit a pull request

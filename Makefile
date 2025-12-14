@@ -37,14 +37,23 @@ build-latency-%:
 #-------------------------------------------------------------------------------
 
 .PHONY: test
-test: build
-	@echo "=== Running all tests ==="
-	cd $(SIM_DIR) && python3 -m pytest ../$(TESTS_DIR) -v
+test: test-python test-rtl
+	@echo "=== All tests completed ==="
+
+.PHONY: test-python
+test-python:
+	@echo "=== Running Python tests ==="
+	python3 -m pytest $(TESTS_DIR) -v --ignore=$(TESTS_DIR)/test_h3_risk_controls.py
+
+.PHONY: test-rtl
+test-rtl: build
+	@echo "=== Running RTL tests ==="
+	cd $(SIM_DIR) && python3 -m pytest ../$(TESTS_DIR)/test_h1_*.py -v
 
 .PHONY: test-quick
 test-quick: build
 	@echo "=== Running quick tests ==="
-	cd $(SIM_DIR) && python3 -m pytest ../$(TESTS_DIR) -v -x --ignore=../$(TESTS_DIR)/test_h1_determinism.py
+	cd $(SIM_DIR) && python3 -m pytest ../$(TESTS_DIR) -v -x --ignore=../$(TESTS_DIR)/test_h1_determinism.py --ignore=../$(TESTS_DIR)/test_h3_risk_controls.py
 
 .PHONY: test-latency
 test-latency: build
@@ -89,6 +98,12 @@ run: build
 run-trace: build
 	@echo "=== Running simulation with VCD trace ==="
 	$(SIM_DIR)/obj_dir/Vtb_sentinel_shell --test latency --num-tx 100 --trace
+
+.PHONY: demo
+demo:
+	@echo "=== Running demo ==="
+	sentinel-hft demo --output-dir demo_output
+	@echo "Demo output in demo_output/"
 
 #-------------------------------------------------------------------------------
 # Lint Targets

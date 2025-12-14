@@ -1,6 +1,6 @@
 [project]
 name = "sentinel-hft"
-version = "2.0.0"
+version = "1.0.0"
 description = "Hardware execution observability for crypto trading infrastructure"
 readme = "README.md"
 license = {text = "MIT"}
@@ -33,15 +33,27 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+ai = [
+    "anthropic>=0.18.0",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
 ]
+all = [
+    "sentinel-hft[ai,dev]",
+]
 
 [project.scripts]
 sentinel-hft = "cli.main:main"
+
+[project.urls]
+Homepage = "https://github.com/BorjaTR/Sentinel-HFT"
+Documentation = "https://github.com/BorjaTR/Sentinel-HFT#readme"
+Repository = "https://github.com/BorjaTR/Sentinel-HFT"
+Issues = "https://github.com/BorjaTR/Sentinel-HFT/issues"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
@@ -49,7 +61,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["host*", "wind_tunnel*", "cli*"]
+include = ["host*", "wind_tunnel*", "cli*", "ai*", "protocol*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

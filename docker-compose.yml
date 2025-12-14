@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  sentinel-hft:
+    build: .
+    volumes:
+      - ./data:/data        # Input data
+      - ./output:/output    # Output reports
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    command: ["replay", "/data/market_data.csv", "-o", "/output/report.json"]
+
+  demo:
+    build: .
+    volumes:
+      - ./demo_output:/output
+    command: ["demo", "--output-dir", "/output"]
+
+  analyze:
+    build: .
+    volumes:
+      - ./data:/data
+      - ./output:/output
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    command: ["analyze", "/data/traces.bin", "--explain", "-o", "/output/report.md"]
