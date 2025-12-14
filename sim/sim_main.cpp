@@ -13,9 +13,12 @@
  *   --num-tx N       Number of transactions to send (default: 100)
  *   --output FILE    Output trace file (default: trace_output.bin)
  *   --test NAME      Run specific test (latency, backpressure, overflow,
- *                    determinism, equivalence)
+ *                    determinism, equivalence, replay)
  *   --seed N         Random seed for reproducibility
  *   --bp-cycles N    Backpressure cycles for backpressure test
+ *   --stimulus FILE  Load stimulus from binary file (for replay mode)
+ *   --json           Output stats as JSON (for programmatic parsing)
+ *   --clock-ns N     Clock period in nanoseconds (default: 10 = 100MHz)
  */
 
 #include <verilated.h>
@@ -45,6 +48,19 @@ struct TraceRecord {
 
 static_assert(sizeof(TraceRecord) == 32, "TraceRecord must be 32 bytes");
 
+// Stimulus record structure for replay mode (must match Python)
+#pragma pack(push, 1)
+struct StimulusRecord {
+    uint64_t timestamp_ns;  // When to inject (relative to start)
+    uint64_t data;          // 64-bit data payload
+    uint16_t opcode;        // 16-bit opcode
+    uint32_t meta;          // 32-bit metadata
+    uint16_t _padding;      // Align to 24 bytes
+};
+#pragma pack(pop)
+
+static_assert(sizeof(StimulusRecord) == 24, "StimulusRecord must be 24 bytes");
+
 // Global simulation time
 vluint64_t sim_time = 0;
 
@@ -66,6 +82,12 @@ public:
     std::string test_name;
     uint32_t bp_cycles;  // Backpressure cycles for BP test
 
+    // H2: Replay configuration
+    std::string stimulus_file;
+    std::vector<StimulusRecord> stimulus_data;
+    bool json_output;
+    double clock_period_ns;
+
     // Collected traces
     std::vector<TraceRecord> traces;
 
@@ -79,6 +101,7 @@ public:
           num_transactions(100), random_seed(0xDEADBEEF),
           output_file("trace_output.bin"), test_name("latency"),
           bp_cycles(10),
+          stimulus_file(""), json_output(false), clock_period_ns(10.0),
           cycles_run(0), transactions_sent(0), transactions_received(0)
     {
         dut = new Vtb_sentinel_shell;
@@ -556,6 +579,133 @@ public:
         return 0;
     }
 
+    //-------------------------------------------------------------------------
+    // H2: Load stimulus file for replay mode
+    //-------------------------------------------------------------------------
+    bool load_stimulus() {
+        if (stimulus_file.empty()) {
+            fprintf(stderr, "Error: No stimulus file specified\n");
+            return false;
+        }
+
+        std::ifstream in(stimulus_file, std::ios::binary);
+        if (!in) {
+            fprintf(stderr, "Error: Cannot open stimulus file %s\n", stimulus_file.c_str());
+            return false;
+        }
+
+        stimulus_data.clear();
+        StimulusRecord rec;
+        while (in.read(reinterpret_cast<char*>(&rec), sizeof(rec))) {
+            stimulus_data.push_back(rec);
+        }
+
+        if (stimulus_data.empty()) {
+            fprintf(stderr, "Error: No stimulus records loaded from %s\n", stimulus_file.c_str());
+            return false;
+        }
+
+        printf("Loaded %zu stimulus records from %s\n", stimulus_data.size(), stimulus_file.c_str());
+        return true;
+    }
+
+    //-------------------------------------------------------------------------
+    // H2: Replay test mode - inject transactions at specified timestamps
+    //-------------------------------------------------------------------------
+    int test_replay() {
+        if (stimulus_data.empty()) {
+            if (!load_stimulus()) {
+                return 1;
+            }
+        }
+
+        printf("Running replay with %zu transactions...\n", stimulus_data.size());
+        reset();
+
+        double sim_time_ns = 0;
+        size_t stim_idx = 0;
+        uint32_t max_cycles = 10000000;  // Safety limit
+
+        // Run simulation
+        while ((stim_idx < stimulus_data.size() || transactions_received < transactions_sent)
+               && cycles_run < max_cycles) {
+
+            // Check if we should inject next transaction
+            bool inject = false;
+            if (stim_idx < stimulus_data.size()) {
+                if (sim_time_ns >= stimulus_data[stim_idx].timestamp_ns) {
+                    inject = true;
+                }
+            }
+
+            // Try to inject if ready
+            if (inject && dut->in_ready) {
+                dut->in_valid = 1;
+                dut->in_data = stimulus_data[stim_idx].data;
+                dut->in_opcode = stimulus_data[stim_idx].opcode;
+                dut->in_meta = stimulus_data[stim_idx].meta;
+                stim_idx++;
+                transactions_sent++;
+            } else if (inject && !dut->in_ready) {
+                // Keep trying to inject (backpressure)
+                dut->in_valid = 1;
+            } else {
+                dut->in_valid = 0;
+            }
+
+            // Process cycle
+            process_cycle();
+            sim_time_ns += clock_period_ns;
+        }
+
+        // Drain any remaining
+        dut->in_valid = 0;
+        for (int i = 0; i < 1000 && transactions_received < transactions_sent; i++) {
+            process_cycle();
+        }
+
+        // Final trace collection
+        for (int i = 0; i < 100; i++) {
+            process_cycle();
+        }
+
+        write_traces();
+
+        if (json_output) {
+            print_json_stats();
+        } else {
+            print_summary();
+        }
+
+        bool pass = (transactions_received == transactions_sent);
+        if (!pass) {
+            fprintf(stderr, "FAIL: Only %lu/%lu transactions completed\n",
+                    transactions_received, transactions_sent);
+        }
+
+        return pass ? 0 : 1;
+    }
+
+    //-------------------------------------------------------------------------
+    // H2: Print stats as JSON for programmatic parsing
+    //-------------------------------------------------------------------------
+    void print_json_stats() {
+        printf("{");
+        printf("\"test\": \"%s\", ", test_name.c_str());
+        printf("\"transactions_sent\": %lu, ", transactions_sent);
+        printf("\"transactions_received\": %lu, ", transactions_received);
+        printf("\"traces_collected\": %zu, ", traces.size());
+        printf("\"trace_drops\": %lu, ", (unsigned long)dut->trace_drop_count);
+        printf("\"cycles_simulated\": %lu, ", cycles_run);
+        printf("\"in_backpressure_cycles\": %lu, ", (unsigned long)dut->in_backpressure_cycles);
+        printf("\"out_backpressure_cycles\": %lu, ", (unsigned long)dut->out_backpressure_cycles);
+        printf("\"inflight_underflows\": %u, ", dut->inflight_underflow_count);
+        printf("\"trace_overflow_seen\": %s, ", dut->trace_overflow_seen ? "true" : "false");
+        printf("\"clock_period_ns\": %.1f, ", clock_period_ns);
+        printf("\"output_file\": \"%s\"", output_file.c_str());
+        printf("}\n");
+    }
+
     // Run the selected test
     int run_test() {
         if (test_name == "latency") {
@@ -568,6 +718,8 @@ public:
             return test_determinism();
         } else if (test_name == "equivalence") {
             return test_equivalence();
+        } else if (test_name == "replay") {
+            return test_replay();
         } else {
             fprintf(stderr, "Unknown test: %s\n", test_name.c_str());
             return 1;
@@ -582,9 +734,12 @@ void print_usage(const char* prog) {
     printf("  --num-tx N       Number of transactions (default: 100)\n");
     printf("  --output FILE    Output trace file (default: trace_output.bin)\n");
     printf("  --test NAME      Test to run: latency, backpressure, overflow,\n");
-    printf("                   determinism, equivalence (default: latency)\n");
+    printf("                   determinism, equivalence, replay (default: latency)\n");
     printf("  --seed N         Random seed (default: 0xDEADBEEF)\n");
     printf("  --bp-cycles N    Backpressure cycles for BP test (default: 10)\n");
+    printf("  --stimulus FILE  Stimulus file for replay mode (binary format)\n");
+    printf("  --json           Output stats as JSON\n");
+    printf("  --clock-ns N     Clock period in nanoseconds (default: 10)\n");
     printf("  --help           Show this help\n");
 }
 
@@ -607,6 +762,12 @@ int main(int argc, char** argv) {
             tb.random_seed = strtoul(argv[++i], nullptr, 0);
         } else if (strcmp(argv[i], "--bp-cycles") == 0 && i + 1 < argc) {
             tb.bp_cycles = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--stimulus") == 0 && i + 1 < argc) {
+            tb.stimulus_file = argv[++i];
+        } else if (strcmp(argv[i], "--json") == 0) {
+            tb.json_output = true;
+        } else if (strcmp(argv[i], "--clock-ns") == 0 && i + 1 < argc) {
+            tb.clock_period_ns = atof(argv[++i]);
         } else if (strcmp(argv[i], "--help") == 0) {
             print_usage(argv[0]);
             return 0;

@@ -1,0 +1,1 @@
+"""Sentinel-HFT CLI package."""
