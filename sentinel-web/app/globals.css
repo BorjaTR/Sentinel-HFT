@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 95%;
+    --primary: 142 76% 36%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 142 76% 36%;
+    --accent-foreground: 0 0% 100%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 142 76% 36%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/5 backdrop-blur-lg border border-white/10;
+  }
+
+  .glow {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+  }
+
+  .glow-strong {
+    box-shadow: 0 0 40px rgba(34, 197, 94, 0.5);
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-sentinel-400 to-sentinel-600;
+  }
+
+  .terminal {
+    @apply font-mono bg-black/50 rounded-lg border border-dark-border;
+  }
+
+  .metric-card {
+    @apply glass rounded-xl p-4 hover:border-sentinel-500/50 transition-colors;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-dark-bg;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-dark-border rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-dark-muted;
+}
+
+.prose {
+  @apply max-w-none;
+}
+
+.prose p {
+  @apply mb-2;
+}
+
+.prose ul {
+  @apply list-disc list-inside mb-2;
+}
+
+.prose ol {
+  @apply list-decimal list-inside mb-2;
+}
+
+.prose code {
+  @apply px-1 py-0.5 bg-black/30 rounded text-sentinel-400;
+}
+
+.prose strong {
+  @apply font-semibold text-white;
+}
+
+.prose table {
+  @apply w-full text-sm;
+}
+
+.prose th {
+  @apply text-left py-1 border-b border-dark-border;
+}
+
+.prose td {
+  @apply py-1;
+}

@@ -1,0 +1,66 @@
+{
+  "metadata": {
+    "filename": "demo_trading_session.bin",
+    "format": "v1.2",
+    "records": 1247832,
+    "duration_seconds": 4.38,
+    "clock_mhz": 100
+  },
+  "analysis": {
+    "status": "healthy",
+    "latency": {
+      "p50": 42,
+      "p90": 67,
+      "p99": 89,
+      "p999": 142,
+      "min": 18,
+      "max": 312,
+      "mean": 48
+    },
+    "throughput": {
+      "total": 1247832,
+      "per_second": 284535
+    },
+    "drops": {
+      "count": 3,
+      "rate": 0.0000024
+    },
+    "attribution": {
+      "total_ns": 87,
+      "ingress_ns": 8,
+      "core_ns": 45,
+      "risk_ns": 27,
+      "egress_ns": 7,
+      "overhead_ns": 0,
+      "bottleneck": "core",
+      "bottleneck_pct": 0.52
+    },
+    "anomalies": [
+      {
+        "type": "latency_spike",
+        "severity": "medium",
+        "timestamp": 2.341,
+        "description": "3.2x baseline latency spike detected"
+      },
+      {
+        "type": "backpressure",
+        "severity": "low",
+        "timestamp": 3.892,
+        "description": "47 cycles of downstream backpressure"
+      }
+    ]
+  },
+  "timeline": [
+    { "time": 0.0, "p99": 85, "count": 28453, "type": "normal" },
+    { "time": 0.5, "p99": 87, "count": 28512, "type": "normal" },
+    { "time": 1.0, "p99": 84, "count": 28489, "type": "normal" },
+    { "time": 1.5, "p99": 88, "count": 28501, "type": "normal" },
+    { "time": 2.0, "p99": 91, "count": 28234, "type": "normal" },
+    { "time": 2.341, "p99": 285, "count": 27123, "type": "spike" },
+    { "time": 2.5, "p99": 95, "count": 28012, "type": "normal" },
+    { "time": 3.0, "p99": 86, "count": 28567, "type": "normal" },
+    { "time": 3.5, "p99": 89, "count": 28234, "type": "normal" },
+    { "time": 3.892, "p99": 156, "count": 25123, "type": "backpressure" },
+    { "time": 4.0, "p99": 88, "count": 28345, "type": "normal" }
+  ]
+}
