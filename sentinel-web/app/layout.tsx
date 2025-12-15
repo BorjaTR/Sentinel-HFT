@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProviderWrapper } from "@/components/providers/ClerkProviderWrapper";
 import { Navigation } from "@/components/shared/Navigation";
 import { Footer } from "@/components/shared/Footer";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -58,11 +59,13 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans antialiased bg-dark-bg text-white">
-        <TooltipProvider>
-          <Navigation />
-          <main className="min-h-screen">{children}</main>
-          <Footer />
-        </TooltipProvider>
+        <ClerkProviderWrapper>
+          <TooltipProvider>
+            <Navigation />
+            <main className="min-h-screen">{children}</main>
+            <Footer />
+          </TooltipProvider>
+        </ClerkProviderWrapper>
       </body>
     </html>
   );
