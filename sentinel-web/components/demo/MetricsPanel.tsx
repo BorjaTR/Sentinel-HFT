@@ -76,11 +76,13 @@ export function MetricsPanel({
   isLive,
 }: MetricsPanelProps) {
   const budgetStatus = metrics.p99 <= budget ? "good" : "bad";
+  const lastP99 = history.length > 0 ? history[history.length - 1]?.p99 : undefined;
+  const prevP99 = history.length > 1 ? history[history.length - 2]?.p99 : undefined;
   const p99Trend =
-    history.length > 1
-      ? history[history.length - 1].p99 > history[history.length - 2].p99
+    lastP99 !== undefined && prevP99 !== undefined
+      ? lastP99 > prevP99
         ? "up"
-        : history[history.length - 1].p99 < history[history.length - 2].p99
+        : lastP99 < prevP99
         ? "down"
         : "stable"
       : "stable";
