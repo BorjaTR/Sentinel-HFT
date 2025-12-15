@@ -40,6 +40,11 @@ dependencies = [
 api = [
     "flask>=3.0.0",
 ]
+server = [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "python-multipart>=0.0.6",
+]
 prometheus = [
     "prometheus-client>=0.17.0",
 ]
@@ -56,7 +61,7 @@ dev = [
     "ruff>=0.1.0",
 ]
 all = [
-    "sentinel-hft[api,prometheus,slack,ai,dev]",
+    "sentinel-hft[api,server,prometheus,slack,ai,dev]",
 ]
 
 [project.scripts]

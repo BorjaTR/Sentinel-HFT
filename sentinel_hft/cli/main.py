@@ -404,9 +404,58 @@ if HAS_RICH:
     # === VERSION COMMAND ===
 
     @app.command()
-    def version():
+    def version(
+        verbose: bool = typer.Option(False, "-v", "--verbose", help="Show detailed info"),
+    ):
         """Show version information."""
-        console.print(f"Sentinel-HFT v{__version__}")
+        console.print(f"[bold blue]Sentinel-HFT v{__version__}[/]")
+
+        if verbose:
+            console.print()
+            table = Table(show_header=False, box=None)
+            table.add_column("Feature", style="cyan")
+            table.add_column("Status", style="green")
+
+            # Core features
+            table.add_row("Trace Analysis", "✓ Streaming quantile estimation")
+            table.add_row("Report Schema", "✓ JSON/YAML/Markdown export")
+            table.add_row("Regression Testing", "✓ CI/CD integration")
+
+            # Phase 1: Attribution
+            table.add_row("Latency Attribution", "✓ v1.2 format (64-byte records)")
+            table.add_row("Stage Breakdown", "✓ ingress/core/risk/egress/overhead")
+
+            # Phase 2: Fault Injection
+            table.add_row("Fault Injection", "✓ 8 fault types")
+            table.add_row("Test Scenarios", "✓ Built-in + custom")
+
+            # Phase 3: Server
+            try:
+                from ..server import app as server_app
+                if server_app:
+                    table.add_row("HTTP Server", "✓ FastAPI (port 8000)")
+                else:
+                    table.add_row("HTTP Server", "○ Not installed")
+            except ImportError:
+                table.add_row("HTTP Server", "○ Not installed")
+
+            # Optional features
+            try:
+                import anthropic
+                table.add_row("AI Explainer", "✓ Claude integration")
+            except ImportError:
+                table.add_row("AI Explainer", "○ Not installed")
+
+            try:
+                import prometheus_client
+                table.add_row("Prometheus", "✓ Metrics export")
+            except ImportError:
+                table.add_row("Prometheus", "○ Not installed")
+
+            console.print(table)
+
+            console.print()
+            console.print("[dim]Install extras: pip install sentinel-hft[all][/]")
 
 
     # === DEMO COMMAND ===
@@ -414,17 +463,24 @@ if HAS_RICH:
     @app.command()
     def demo(
         output_dir: Path = typer.Option(Path("./demo_output"), "-o", "--output-dir"),
+        show_all: bool = typer.Option(False, "--all", help="Demo all features"),
     ):
-        """Run demo with sample data."""
+        """Run demo with sample data showing Sentinel-HFT capabilities."""
         import random
         import struct
 
-        console.print("[bold blue]Sentinel-HFT Demo[/]")
+        console.print(Panel.fit(
+            f"[bold blue]Sentinel-HFT v{__version__} Demo[/]",
+            border_style="blue"
+        ))
 
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Generate sample traces
-        console.print("Generating sample traces...")
+        # ===========================================
+        # DEMO 1: Basic Trace Analysis (v1.1)
+        # ===========================================
+        console.print("\n[bold cyan]1. Basic Trace Analysis[/]")
+        console.print("   Generating v1.1 traces with realistic latency distribution...")
 
         from ..formats.file_header import FileHeader
 
@@ -452,7 +508,7 @@ if HAS_RICH:
             record += b'\x00' * (48 - len(record))  # Pad to 48 bytes
             traces_data.append(record)
 
-        trace_file = output_dir / "demo_traces.bin"
+        trace_file = output_dir / "demo_traces_v11.bin"
         header = FileHeader(version=1, record_size=48, record_count=num_traces, clock_mhz=100)
 
         with open(trace_file, 'wb') as f:
@@ -460,11 +516,9 @@ if HAS_RICH:
             for t in traces_data:
                 f.write(t)
 
-        console.print(f"  Created: {trace_file} ({num_traces:,} traces)")
+        console.print(f"   [green]✓[/] Created: {trace_file.name} ({num_traces:,} traces)")
 
         # Analyze
-        console.print("Analyzing...")
-
         cfg = SentinelConfig()
         streaming_config = StreamingConfig(clock_hz=cfg.clock.frequency_hz)
         metrics = StreamingMetrics(streaming_config)
@@ -498,12 +552,128 @@ if HAS_RICH:
         report.compute_status()
         report.populate_ns_values()
 
-        report_file = output_dir / "demo_report.json"
+        report_file = output_dir / "demo_report_v11.json"
         report_file.write_text(report.to_json(indent=2))
-        console.print(f"  Created: {report_file}")
+        console.print(f"   [green]✓[/] Analysis: {report_file.name}")
 
-        _print_summary(snapshot, 0, num_traces)
-        console.print(f"\n[green]Demo complete![/] Output: {output_dir}")
+        # ===========================================
+        # DEMO 2: v1.2 Latency Attribution
+        # ===========================================
+        console.print("\n[bold cyan]2. Latency Attribution (v1.2)[/]")
+        console.print("   Generating v1.2 traces with stage-level timing...")
+
+        from ..adapters.sentinel_adapter_v12 import V12_STRUCT, V12_SIZE
+
+        traces_v12 = []
+        for i in range(num_traces):
+            # Realistic stage breakdown
+            d_ingress = random.randint(2, 5)
+            d_core = random.randint(10, 30)
+            d_risk = random.randint(3, 10)
+            d_egress = random.randint(2, 5)
+
+            # Occasional spikes
+            if random.random() < 0.01:
+                d_core += random.randint(20, 100)
+
+            total = d_ingress + d_core + d_risk + d_egress + random.randint(1, 3)  # overhead
+
+            record = V12_STRUCT.pack(
+                2,          # version (v1.2)
+                1,          # record_type (TX_EVENT)
+                0,          # core_id
+                i,          # seq_no
+                i * 100,    # t_ingress
+                i * 100 + total,  # t_egress
+                0,          # t_host
+                i % 65536,  # tx_id
+                1,          # flags
+                d_ingress,
+                d_core,
+                d_risk,
+                d_egress,
+            )
+            traces_v12.append(record)
+
+        trace_file_v12 = output_dir / "demo_traces_v12.bin"
+        header_v12 = FileHeader(version=2, record_size=64, record_count=num_traces, clock_mhz=100)
+
+        with open(trace_file_v12, 'wb') as f:
+            f.write(header_v12.encode())
+            for t in traces_v12:
+                f.write(t)
+
+        console.print(f"   [green]✓[/] Created: {trace_file_v12.name} (64-byte records)")
+
+        # Show attribution breakdown
+        from ..streaming.attribution import AttributionTracker
+        from ..adapters.sentinel_adapter_v12 import SentinelV12Adapter
+
+        attr_tracker = AttributionTracker()
+        adapter = SentinelV12Adapter(clock_mhz=100.0)
+
+        for _, attribution in adapter.iterate_with_attribution(trace_file_v12):
+            attr_tracker.update(attribution)
+
+        attr_metrics = attr_tracker.get_metrics()
+        if attr_metrics:
+            attr_table = Table(title="Stage Attribution", show_header=True)
+            attr_table.add_column("Stage")
+            attr_table.add_column("P99 (ns)", justify="right")
+            attr_table.add_column("% of Total", justify="right")
+
+            for stage in attr_metrics.stages:
+                pct_style = "red" if stage.pct_of_total > 0.5 else "green"
+                attr_table.add_row(
+                    stage.stage.capitalize(),
+                    f"{stage.p99:.0f}",
+                    f"[{pct_style}]{stage.pct_of_total:.1%}[/]"
+                )
+
+            console.print(attr_table)
+            console.print(f"   [yellow]Bottleneck:[/] {attr_metrics.bottleneck} ({attr_metrics.bottleneck_pct:.1%})")
+
+        # ===========================================
+        # DEMO 3: Fault Injection Scenarios
+        # ===========================================
+        console.print("\n[bold cyan]3. Fault Injection Testing[/]")
+        console.print("   Available scenarios for resilience testing...")
+
+        from ..testing import list_scenarios, get_scenario
+
+        scenarios = list_scenarios()
+        scenario_table = Table(show_header=True)
+        scenario_table.add_column("Scenario")
+        scenario_table.add_column("Description")
+        scenario_table.add_column("Fault Types")
+
+        for name in scenarios[:4]:  # Show first 4
+            scenario = get_scenario(name)
+            if scenario:
+                fault_types = ", ".join(f.fault_type.value for f in scenario.faults[:2])
+                if len(scenario.faults) > 2:
+                    fault_types += "..."
+                scenario_table.add_row(name, scenario.description, fault_types)
+
+        console.print(scenario_table)
+        console.print(f"   [dim]Total scenarios: {len(scenarios)}[/]")
+
+        # ===========================================
+        # Summary
+        # ===========================================
+        console.print()
+        console.print(Panel.fit(
+            f"[green bold]Demo Complete![/]\n\n"
+            f"Output directory: {output_dir}\n"
+            f"Files created:\n"
+            f"  • demo_traces_v11.bin (v1.1 format)\n"
+            f"  • demo_traces_v12.bin (v1.2 with attribution)\n"
+            f"  • demo_report_v11.json",
+            title="Summary",
+            border_style="green"
+        ))
+
+        console.print("\n[dim]Run 'sentinel-hft version -v' for feature status[/]")
 
 
 def main():

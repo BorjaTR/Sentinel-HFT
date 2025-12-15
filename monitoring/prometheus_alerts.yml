@@ -1,0 +1,82 @@
+# Prometheus alert rules for Sentinel-HFT
+groups:
+  - name: sentinel_hft_alerts
+    rules:
+      # High latency alert
+      - alert: HighP99Latency
+        expr: sentinel_latency_p99_ns > 1000000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High P99 latency detected"
+          description: "P99 latency is {{ $value }}ns, exceeding 1ms threshold"
+
+      # Very high latency alert
+      - alert: CriticalP99Latency
+        expr: sentinel_latency_p99_ns > 5000000
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical P99 latency detected"
+          description: "P99 latency is {{ $value }}ns, exceeding 5ms threshold"
+
+      # Gap detection alert
+      - alert: SequenceGapDetected
+        expr: sentinel_sequence_gaps_total > 0
+        for: 0s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Sequence gap detected in trace data"
+          description: "{{ $value }} sequence gaps detected"
+
+      # High gap rate alert
+      - alert: HighGapRate
+        expr: rate(sentinel_sequence_gaps_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High sequence gap rate"
+          description: "More than 10 gaps per second detected"
+
+      # Bottleneck detection
+      - alert: CoreBottleneck
+        expr: sentinel_bottleneck_stage{stage="core"} > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Core stage is bottleneck"
+          description: "Core processing consuming >80% of total latency"
+
+      - alert: RiskBottleneck
+        expr: sentinel_bottleneck_stage{stage="risk"} > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Risk gate is bottleneck"
+          description: "Risk gate consuming >80% of total latency"
+
+      # Server health
+      - alert: SentinelServerDown
+        expr: up{job="sentinel-hft"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Sentinel-HFT server is down"
+          description: "The Sentinel-HFT metrics server is not responding"
+
+      # Analysis errors
+      - alert: HighAnalysisErrorRate
+        expr: rate(sentinel_analysis_errors_total[5m]) > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High analysis error rate"
+          description: "More than 1 analysis error per second"
