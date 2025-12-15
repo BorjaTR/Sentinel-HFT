@@ -131,10 +131,8 @@ export function TraceTimeline({
           .attr("font-size", "11px")
           .text(`${d.stage}: ${formatLatency(d.duration)}`);
       })
-      .on("mouseout", function () {
-        d3.select(this).attr("opacity", (d: TimelineSegment) =>
-          d.anomaly ? 1 : 0.7
-        );
+      .on("mouseout", function (event, d) {
+        d3.select(this).attr("opacity", d.anomaly ? 1 : 0.7);
         g.selectAll(".tooltip").remove();
       });
 

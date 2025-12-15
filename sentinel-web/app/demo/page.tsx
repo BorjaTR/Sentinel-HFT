@@ -203,7 +203,7 @@ export default function DemoPage() {
 
   const handleFaultInject = useCallback(
     (fault: { type: string; duration: number }) => {
-      setActiveFaults((prev) => new Set([...prev, fault.type]));
+      setActiveFaults((prev) => new Set([...Array.from(prev), fault.type]));
       setTimeout(() => {
         setActiveFaults((prev) => {
           const next = new Set(prev);

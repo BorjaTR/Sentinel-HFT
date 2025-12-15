@@ -15,39 +15,22 @@ export interface TraceRecord {
 }
 
 export interface Attribution {
-  total_ns: number;
-  ingress_ns: number;
-  core_ns: number;
-  risk_ns: number;
-  egress_ns: number;
-  overhead_ns: number;
-  bottleneck: string;
-  bottleneck_pct: number;
+  ingress: number;
+  core: number;
+  risk: number;
+  egress: number;
 }
 
 export interface LatencyMetrics {
   p50: number;
   p90: number;
   p99: number;
-  p999: number;
+  p99_9: number;
   min: number;
   max: number;
   mean: number;
-}
-
-export interface AnalysisResult {
-  status: "healthy" | "warning" | "critical";
-  latency: LatencyMetrics;
-  throughput: {
-    total: number;
-    per_second: number;
-  };
-  drops: {
-    count: number;
-    rate: number;
-  };
-  attribution?: Attribution;
-  anomalies: Anomaly[];
+  stdDev: number;
+  throughput: number;
 }
 
 export interface Anomaly {
@@ -55,6 +38,19 @@ export interface Anomaly {
   severity: "low" | "medium" | "high";
   timestamp: number;
   description: string;
+  affectedStage?: string;
+}
+
+export interface AnalysisResult {
+  id: string;
+  timestamp: Date;
+  traceFile: string;
+  totalRecords: number;
+  budget: number;
+  budgetMet: boolean;
+  metrics: LatencyMetrics;
+  attribution?: Attribution;
+  anomalies: Anomaly[];
 }
 
 export interface Message {
@@ -69,29 +65,38 @@ export interface Message {
 export interface Attachment {
   type: "trace" | "config" | "report";
   name: string;
-  size: number;
-  data?: ArrayBuffer;
+  size?: number;
+  data?: {
+    totalRecords?: number;
+    p99Latency?: number;
+    throughput?: number;
+    anomalyCount?: number;
+  };
 }
 
 export interface AnalysisSettings {
-  clock_mhz: number;
-  format: "auto" | "v1.0" | "v1.1" | "v1.2";
-  attribution: boolean;
-  anomaly_threshold: number;
-  percentiles: number[];
+  budget: number;
+  percentile: "p50" | "p90" | "p99" | "p99.9";
+  showAttribution: boolean;
+  detectAnomalies: boolean;
+  anomalyThreshold: number;
+  apiKey?: string;
 }
 
 export interface TimelineSegment {
-  start_time: number;
-  end_time: number;
-  type: "normal" | "spike" | "drop" | "backpressure" | "kill_switch";
-  latency_p99: number;
-  count: number;
-  anomalies: Anomaly[];
+  id: string;
+  stage: string;
+  startTime: number;
+  duration: number;
+  anomaly?: boolean;
 }
 
 export interface ChartDataPoint {
   time: number;
-  value: number;
+  p50?: number;
+  p90?: number;
+  p99?: number;
+  max?: number;
+  value?: number;
   label?: string;
 }
