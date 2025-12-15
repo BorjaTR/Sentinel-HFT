@@ -8,11 +8,20 @@
 
 Sentinel-HFT wraps your FPGA trading cores with instrumentation, captures cycle-accurate traces, enforces risk controls, and generates AI-powered latency analysis reports. It provides comprehensive tooling for latency verification, regression testing, fault injection, and real-time monitoring.
 
+### Who Is This For?
+
+- **Crypto HFT firms** — Debug and optimize FPGA execution paths
+- **MEV searchers** — Understand latency in transaction ordering
+- **L2 sequencers** — Analyze sequencer performance
+- **FPGA engineers** — Verify RTL timing behavior
+- **Quant developers** — Regression test trading systems
+
 ---
 
 ## Table of Contents
 
 - [Features](#features)
+- [Performance](#performance)
 - [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Core Features](#core-features)
@@ -48,6 +57,26 @@ Sentinel-HFT wraps your FPGA trading cores with instrumentation, captures cycle-
 | **AI explanations** | Natural language root cause analysis using Claude |
 | **Real-time monitoring** | HTTP server with Prometheus metrics and Grafana dashboards |
 | **CI/CD integration** | GitHub Actions, regression testing, and automated alerts |
+
+---
+
+## Performance
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| **Throughput** | 284,000 traces/sec | Single-threaded Python analysis |
+| **Memory** | O(1) constant | P² quantile estimation algorithm |
+| **Quantile accuracy** | ±0.5% | At P99 with 10K+ samples |
+| **Latency overhead** | <1 cycle | RTL instrumentation wrapper |
+| **Startup time** | <100ms | CLI cold start |
+
+**Benchmarks (10M traces, 100 MHz clock):**
+```
+Analysis time:     35.2s
+Memory usage:      48 MB (constant)
+P99 accuracy:      ±0.3% vs exact
+Records dropped:   0
+```
 
 ---
 
@@ -734,58 +763,45 @@ All trace files start with a header:
 
 ```
 Sentinel-HFT/
-├── rtl/                          # SystemVerilog RTL
-│   ├── sentinel_shell.sv             # v1.1 instrumentation wrapper
-│   ├── sentinel_shell_v12.sv         # v1.2 with attribution
-│   ├── trace_pkg.sv                  # v1.1 trace definitions
-│   ├── trace_pkg_v12.sv              # v1.2 trace definitions
-│   ├── stage_timer.sv                # Cycle counter module
-│   ├── instrumented_pipeline.sv      # Pipeline with timing
-│   ├── risk_gate.sv                  # Risk control module
-│   ├── rate_limiter.sv               # Token bucket limiter
-│   ├── position_limiter.sv           # Position tracking
-│   ├── kill_switch.sv                # Emergency stop
-│   ├── fault_pkg.sv                  # Fault type definitions
-│   ├── fault_injector.sv             # Fault injection module
-│   └── tb_*.sv                       # Testbenches
-├── sentinel_hft/                 # Python package
-│   ├── adapters/                     # Trace format adapters
-│   │   ├── sentinel_adapter.py           # v1.0/v1.1 decoder
-│   │   └── sentinel_adapter_v12.py       # v1.2 decoder
-│   ├── streaming/                    # Streaming analysis
-│   │   ├── analyzer.py                   # Metrics computation
-│   │   ├── quantile.py                   # P2 quantile estimation
-│   │   └── attribution.py                # Attribution tracking
-│   ├── core/                         # Core functionality
-│   │   ├── report.py                     # Report generation
-│   │   └── evidence.py                   # Evidence bundles
-│   ├── formats/                      # File formats
-│   │   ├── file_header.py                # Header parsing
-│   │   └── reader.py                     # Trace reader
-│   ├── ai/                           # AI integration
-│   │   └── attribution_explainer.py      # Attribution analysis
-│   ├── testing/                      # Fault injection
-│   │   ├── fault_injection.py            # Framework
-│   │   └── scenarios.py                  # Built-in scenarios
-│   ├── server/                       # HTTP server
-│   │   └── app.py                        # FastAPI application
-│   ├── exporters/                    # Data exporters
-│   │   ├── prometheus.py                 # Prometheus metrics
-│   │   └── slack.py                      # Slack notifications
-│   ├── cli/                          # Command-line interface
-│   │   └── main.py                       # CLI entry point
-│   └── config.py                     # Configuration
-├── monitoring/                   # Monitoring configuration
-│   ├── prometheus.yml                # Prometheus config
-│   ├── prometheus_alerts.yml         # Alert rules
-│   └── grafana/                      # Grafana setup
-│       ├── dashboards/                   # Dashboard JSON
-│       └── provisioning/                 # Auto-provisioning
-├── tests/                        # Test suite
-├── docker-compose.yml            # Docker services
-├── Dockerfile                    # Container build
-└── pyproject.toml                # Python project config
+├── rtl/              # SystemVerilog RTL (instrumentation, risk, fault injection)
+├── sentinel_hft/     # Python package (analysis, server, exporters, CLI)
+├── monitoring/       # Prometheus + Grafana configuration
+├── tests/            # Test suite (370+ tests)
+├── docker-compose.yml
+└── pyproject.toml
 ```
+
+<details>
+<summary><strong>Full directory structure</strong></summary>
+
+```
+rtl/
+├── sentinel_shell.sv         # v1.1 instrumentation wrapper
+├── sentinel_shell_v12.sv     # v1.2 with attribution
+├── trace_pkg.sv / _v12.sv    # Trace format definitions
+├── stage_timer.sv            # Cycle counter module
+├── risk_gate.sv              # Rate limiter + position limits
+├── fault_injector.sv         # Fault injection module
+└── tb_*.sv                   # Testbenches
+
+sentinel_hft/
+├── adapters/                 # v1.0/v1.1/v1.2 decoders
+├── streaming/                # Quantile estimation, attribution
+├── core/                     # Report generation
+├── formats/                  # File header, trace reader
+├── ai/                       # Claude-powered explanations
+├── testing/                  # Fault injection framework
+├── server/                   # FastAPI REST API
+├── exporters/                # Prometheus, Slack
+└── cli/                      # Command-line interface
+
+monitoring/
+├── prometheus.yml            # Scrape config
+├── prometheus_alerts.yml     # Alert rules
+└── grafana/                  # Dashboards + provisioning
+```
+
+</details>
 
 ---
 
@@ -839,16 +855,6 @@ class FaultType(str, Enum):
 1. Add to `sentinel_hft/streaming/analyzer.py`
 2. Update `sentinel_hft/exporters/prometheus.py`
 3. Add to Grafana dashboard in `monitoring/grafana/dashboards/`
-
----
-
-## Who Is This For?
-
-- **Crypto HFT firms** - Debug and optimize FPGA execution paths
-- **MEV searchers** - Understand latency in transaction ordering
-- **L2 sequencers** - Analyze sequencer performance
-- **FPGA engineers** - Verify RTL timing behavior
-- **Quant developers** - Regression test trading systems
 
 ---
 
