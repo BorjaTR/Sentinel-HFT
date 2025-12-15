@@ -4,15 +4,17 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Github, ExternalLink } from "lucide-react";
+import { Menu, X, Github } from "lucide-react";
 import { Logo } from "./Logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { AuthButtons } from "./AuthButtons";
 
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/analyze", label: "AI Analysis" },
   { href: "/demo", label: "Live Demo" },
+  { href: "/pricing", label: "Pricing" },
 ];
 
 export function Navigation() {
@@ -75,17 +77,8 @@ export function Navigation() {
                 <span>GitHub</span>
               </a>
             </Button>
-            <Button size="sm" asChild>
-              <a
-                href="https://pypi.org/project/sentinel-hft/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2"
-              >
-                <span>Get Started</span>
-                <ExternalLink size={14} />
-              </a>
-            </Button>
+
+            <AuthButtons size="sm" />
           </div>
         </div>
 
@@ -135,17 +128,8 @@ export function Navigation() {
                       <span>GitHub</span>
                     </a>
                   </Button>
-                  <Button size="lg" asChild>
-                    <a
-                      href="https://pypi.org/project/sentinel-hft/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2"
-                    >
-                      <span>Get Started</span>
-                      <ExternalLink size={16} />
-                    </a>
-                  </Button>
+
+                  <AuthButtons size="lg" onNavigate={() => setIsOpen(false)} />
                 </div>
               </div>
             </motion.div>

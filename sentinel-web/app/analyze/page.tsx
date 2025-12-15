@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import { AnalysisChat } from "@/components/analyze/AnalysisChat";
 import { SettingsPanel } from "@/components/analyze/SettingsPanel";
+import { UpgradeModal } from "@/components/analyze/UpgradeModal";
 import { AnalysisSettings } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Settings, X, ChevronRight } from "lucide-react";
+import { Settings, X, ChevronRight, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_SETTINGS: AnalysisSettings = {
@@ -18,9 +21,14 @@ const DEFAULT_SETTINGS: AnalysisSettings = {
 };
 
 export default function AnalyzePage() {
+  const { isSignedIn } = useAuth();
+  const { isPro } = useSubscription();
   const [settings, setSettings] = useState<AnalysisSettings>(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
-  const isDemo = true; // Will be based on auth status
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  // isDemo is true when user is not Pro (either not signed in or free tier)
+  const isDemo = !isPro;
 
   return (
     <div className="min-h-screen pt-16 bg-dark-bg">
@@ -29,13 +37,21 @@ export default function AnalyzePage() {
         <div className="flex-1 flex flex-col">
           {/* Header */}
           <div className="border-b border-dark-border px-4 py-3 flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-semibold">AI Analysis</h1>
-              <p className="text-sm text-gray-400">
-                {isDemo
-                  ? "Demo mode - exploring sample trace"
-                  : "Analyze your trace data"}
-              </p>
+            <div className="flex items-center gap-3">
+              <div>
+                <h1 className="text-lg font-semibold">AI Analysis</h1>
+                <p className="text-sm text-gray-400">
+                  {isDemo
+                    ? "Demo mode - exploring sample trace"
+                    : "Analyze your trace data"}
+                </p>
+              </div>
+              {isPro && (
+                <span className="flex items-center gap-1 px-2 py-0.5 bg-sentinel-500/20 text-sentinel-400 text-xs rounded-full">
+                  <Crown size={12} />
+                  Pro
+                </span>
+              )}
             </div>
             <Button
               variant="ghost"
@@ -48,7 +64,13 @@ export default function AnalyzePage() {
           </div>
 
           {/* Chat Interface */}
-          <AnalysisChat settings={settings} isDemo={isDemo} />
+          <AnalysisChat
+            settings={settings}
+            isDemo={isDemo}
+            isPro={isPro}
+            isSignedIn={isSignedIn}
+            onUpgradeClick={() => setShowUpgradeModal(true)}
+          />
         </div>
 
         {/* Settings Sidebar - Desktop */}
@@ -111,6 +133,13 @@ export default function AnalyzePage() {
           />
         </motion.div>
       )}
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        isSignedIn={isSignedIn}
+      />
     </div>
   );
 }

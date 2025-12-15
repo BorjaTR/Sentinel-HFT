@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Loader2, Sparkles, Upload, FileText } from "lucide-react";
+import { Send, Loader2, Sparkles, Upload, FileText, Lock } from "lucide-react";
 import { Message, AnalysisSettings, AnalysisResult } from "@/types";
 import { MessageBubble } from "./MessageBubble";
 import { ResultsDisplay } from "./ResultsDisplay";
@@ -14,6 +14,9 @@ import { findDemoResponse, getDemoAnalysisResult } from "@/data/demo-responses";
 interface AnalysisChatProps {
   settings: AnalysisSettings;
   isDemo: boolean;
+  isPro: boolean;
+  isSignedIn: boolean;
+  onUpgradeClick: () => void;
 }
 
 const INITIAL_MESSAGES: Message[] = [
@@ -34,6 +37,22 @@ Try asking a question to get started!`,
   },
 ];
 
+const PRO_WELCOME_MESSAGES: Message[] = [
+  {
+    id: "welcome",
+    role: "assistant",
+    content: `Welcome to Sentinel-HFT AI Analysis! As a **Pro** subscriber, you have full access to:
+
+- **Upload your own traces** using the upload button below
+- **Live AI-powered analysis** of your custom data
+- **Export reports** in JSON or PDF format
+- **Unlimited analyses** with no restrictions
+
+Upload a trace file to get started, or ask me questions about FPGA latency analysis!`,
+    timestamp: new Date(),
+  },
+];
+
 const SUGGESTED_QUERIES = [
   "Analyze this trace file",
   "Where are the bottlenecks?",
@@ -42,14 +61,23 @@ const SUGGESTED_QUERIES = [
   "Explain the attribution breakdown",
 ];
 
-export function AnalysisChat({ settings, isDemo }: AnalysisChatProps) {
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
+export function AnalysisChat({
+  settings,
+  isDemo,
+  isPro,
+  isSignedIn,
+  onUpgradeClick,
+}: AnalysisChatProps) {
+  const [messages, setMessages] = useState<Message[]>(
+    isPro ? PRO_WELCOME_MESSAGES : INITIAL_MESSAGES
+  );
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Scroll to bottom when new messages are added
@@ -57,6 +85,80 @@ export function AnalysisChat({ settings, isDemo }: AnalysisChatProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Update welcome message when Pro status changes
+  useEffect(() => {
+    if (messages.length === 1 && messages[0].id === "welcome") {
+      setMessages(isPro ? PRO_WELCOME_MESSAGES : INITIAL_MESSAGES);
+    }
+  }, [isPro, messages.length, messages]);
+
+  const handleFileUpload = async (file: File) => {
+    if (!isPro) {
+      onUpgradeClick();
+      return;
+    }
+
+    // Pro users: actually upload and analyze
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("budget", settings.budget.toString());
+
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Analysis failed");
+
+      const result = await res.json();
+      setAnalysisResult(result);
+      setShowResults(true);
+
+      const assistantMessage: Message = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: `I've analyzed your trace file **${file.name}**. Here's what I found:
+
+The trace contains **${result.totalRecords?.toLocaleString() || "N/A"}** records with an overall P99 latency of **${result.metrics?.p99 || "N/A"}ns**.
+
+${result.anomalies?.length > 0 ? `I detected **${result.anomalies.length}** anomalies that may require attention.` : "No significant anomalies were detected."}
+
+Check the visualization below for detailed metrics, or ask me specific questions about the analysis.`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch {
+      const errorMessage: Message = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: "Sorry, there was an error analyzing your file. Please ensure it's a valid Sentinel-HFT trace file and try again.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+    // Reset input so the same file can be selected again
+    e.target.value = "";
+  };
+
+  const handleUploadClick = () => {
+    if (!isPro) {
+      onUpgradeClick();
+      return;
+    }
+    fileInputRef.current?.click();
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -127,6 +229,21 @@ export function AnalysisChat({ settings, isDemo }: AnalysisChatProps) {
 
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)]">
+      {/* Demo Mode Banner - only show for non-Pro users */}
+      {isDemo && (
+        <div className="mx-4 mt-4 px-4 py-2 bg-sentinel-500/10 border border-sentinel-500/20 rounded-lg flex items-center justify-between text-sm">
+          <span className="text-sentinel-400">
+            Demo Mode — Exploring sample trace (1.2M transactions)
+          </span>
+          <button
+            onClick={onUpgradeClick}
+            className="text-sentinel-400 hover:text-sentinel-300 underline font-medium"
+          >
+            Upgrade for custom uploads
+          </button>
+        </div>
+      )}
+
       {/* Chat Messages */}
       <ScrollArea ref={scrollRef} className="flex-1 px-4 py-6">
         <div className="max-w-3xl mx-auto space-y-6">
@@ -194,15 +311,27 @@ export function AnalysisChat({ settings, isDemo }: AnalysisChatProps) {
       <div className="border-t border-dark-border p-4">
         <div className="max-w-3xl mx-auto">
           <div className="flex gap-3">
-            {/* File Upload Button (disabled in demo) */}
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".bin,.trace"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+
+            {/* File Upload Button */}
             <Button
               variant="outline"
               size="icon"
-              disabled={isDemo}
-              className="shrink-0"
-              title={isDemo ? "File upload available in Pro" : "Upload trace file"}
+              onClick={handleUploadClick}
+              className="shrink-0 relative"
+              title={isPro ? "Upload trace file" : "Upgrade to Pro to upload files"}
             >
               <Upload size={18} />
+              {!isPro && (
+                <Lock size={10} className="absolute -top-1 -right-1 text-sentinel-400" />
+              )}
             </Button>
 
             {/* Text Input */}
