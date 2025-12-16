@@ -7,10 +7,13 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { AnalysisChat } from "@/components/analyze/AnalysisChat";
 import { SettingsPanel } from "@/components/analyze/SettingsPanel";
 import { UpgradeModal } from "@/components/analyze/UpgradeModal";
-import { AnalysisSettings } from "@/types";
+import { PerformanceDoctor } from "@/components/analyze/PerformanceDoctor";
+import { AnalysisSettings, AnalysisResult } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Settings, X, ChevronRight, Crown } from "lucide-react";
+import { Settings, X, ChevronRight, Crown, MessageSquare, Stethoscope } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+type ViewMode = "chat" | "doctor";
 
 const DEFAULT_SETTINGS: AnalysisSettings = {
   budget: 850,
@@ -26,6 +29,8 @@ export default function AnalyzePage() {
   const [settings, setSettings] = useState<AnalysisSettings>(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("chat");
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
   // isDemo is true when user is not Pro (either not signed in or free tier)
   const isDemo = !isPro;
@@ -53,24 +58,62 @@ export default function AnalyzePage() {
                 </span>
               )}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowSettings(!showSettings)}
-              className="lg:hidden"
-            >
-              {showSettings ? <X size={18} /> : <Settings size={18} />}
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* View Mode Tabs */}
+              <div className="flex items-center bg-dark-card rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode("chat")}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                    viewMode === "chat"
+                      ? "bg-sentinel-500 text-white"
+                      : "text-gray-400 hover:text-white"
+                  )}
+                >
+                  <MessageSquare size={16} />
+                  <span className="hidden sm:inline">Chat</span>
+                </button>
+                <button
+                  onClick={() => setViewMode("doctor")}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                    viewMode === "doctor"
+                      ? "bg-sentinel-500 text-white"
+                      : "text-gray-400 hover:text-white"
+                  )}
+                >
+                  <Stethoscope size={16} />
+                  <span className="hidden sm:inline">Doctor</span>
+                </button>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSettings(!showSettings)}
+                className="lg:hidden"
+              >
+                {showSettings ? <X size={18} /> : <Settings size={18} />}
+              </Button>
+            </div>
           </div>
 
-          {/* Chat Interface */}
-          <AnalysisChat
-            settings={settings}
-            isDemo={isDemo}
-            isPro={isPro}
-            isSignedIn={isSignedIn}
-            onUpgradeClick={() => setShowUpgradeModal(true)}
-          />
+          {/* Main Content */}
+          {viewMode === "chat" ? (
+            <AnalysisChat
+              settings={settings}
+              isDemo={isDemo}
+              isPro={isPro}
+              isSignedIn={isSignedIn}
+              onUpgradeClick={() => setShowUpgradeModal(true)}
+            />
+          ) : (
+            <div className="flex-1 overflow-y-auto p-4">
+              <PerformanceDoctor
+                analysisResult={analysisResult}
+                isDemo={isDemo}
+              />
+            </div>
+          )}
         </div>
 
         {/* Settings Sidebar - Desktop */}

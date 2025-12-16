@@ -100,3 +100,40 @@ export interface ChartDataPoint {
   value?: number;
   label?: string;
 }
+
+// Performance Doctor / Prescription Engine types
+export type PrescriptionSeverity = "critical" | "warning" | "info" | "success";
+export type PrescriptionCategory = "bottleneck" | "anomaly" | "optimization" | "configuration" | "health";
+
+export interface Prescription {
+  id: string;
+  title: string;
+  severity: PrescriptionSeverity;
+  category: PrescriptionCategory;
+  diagnosis: string;
+  prescription: string;
+  impact: string;
+  effort: "low" | "medium" | "high";
+  affectedStage?: string;
+  metrics?: {
+    current: number;
+    target: number;
+    unit: string;
+  };
+  codeHint?: string;
+}
+
+export interface DiagnosisReport {
+  id: string;
+  timestamp: Date;
+  overallHealth: "healthy" | "warning" | "critical";
+  healthScore: number; // 0-100
+  summary: string;
+  prescriptions: Prescription[];
+  metrics: {
+    totalIssues: number;
+    criticalCount: number;
+    warningCount: number;
+    optimizationCount: number;
+  };
+}
