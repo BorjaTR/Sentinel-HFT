@@ -1,0 +1,135 @@
+# FOMC Backpressure Scenario
+# Realistic simulation of market stress causing FIFO saturation
+
+scenario:
+  id: fomc_backpressure
+  name: "FOMC Announcement Backpressure"
+  description: |
+    Federal Reserve announces rate decision. Market data volume spikes 8x.
+    Risk stage FIFO saturates, causing upstream backpressure.
+    P99 latency increases from 89ns to 142ns.
+
+  narrative: |
+    It's 2:00 PM ET. The Fed announces a surprise 50bp rate hike.
+    CME market data explodes. Your trading system handles the first
+    30 seconds, then latency starts climbing. By 2:01 PM, P99 has
+    jumped 60%. Alerts are firing. The on-call engineer needs answers.
+
+# Baseline configuration (normal operation)
+baseline:
+  name: "Normal Trading Day"
+  message_rate: 2000000  # 2M msg/sec
+  duration_ms: 1000
+  trace_count: 50000
+
+  latency_profile:
+    ingress_ns:
+      mean: 12
+      std: 2
+    core_ns:
+      mean: 25
+      std: 4
+    risk_ns:
+      mean: 31
+      std: 5
+    egress_ns:
+      mean: 18
+      std: 3
+
+  # Normal FIFO behavior
+  fifo_utilization: 0.35  # 35% average
+  backpressure_events: 0
+
+# Incident configuration (FOMC spike)
+incident:
+  name: "FOMC Rate Decision"
+  message_rate: 16000000  # 8x spike
+  duration_ms: 1000
+  trace_count: 50000
+
+  latency_profile:
+    ingress_ns:
+      mean: 14
+      std: 3
+    core_ns:
+      mean: 28
+      std: 5
+    risk_ns:
+      mean: 78
+      std: 25
+    egress_ns:
+      mean: 22
+      std: 8
+
+  # Saturated FIFO
+  fifo_utilization: 0.94  # 94% - near overflow
+  backpressure_events: 1247  # Frequent stalls
+
+  # Anomaly injection
+  anomalies:
+    - type: backpressure_stall
+      frequency: 0.025  # 2.5% of transactions
+      added_latency_ns:
+        mean: 45
+        std: 15
+    - type: fifo_near_full
+      frequency: 0.15   # 15% of time
+      added_latency_ns:
+        mean: 12
+        std: 4
+
+# Bisect timeline (multiple trace files showing progression)
+timeline:
+  - id: t1_normal
+    timestamp: "14:00:00"
+    description: "Normal pre-announcement trading"
+    profile: baseline
+
+  - id: t2_normal
+    timestamp: "14:00:30"
+    description: "Still normal, market waiting"
+    profile: baseline
+
+  - id: t3_spike_start
+    timestamp: "14:00:58"
+    description: "Announcement hits, rate climbing"
+    profile: transition
+    transition_pct: 0.4
+
+  - id: t4_degraded
+    timestamp: "14:01:15"
+    description: "Full spike, latency elevated"
+    profile: incident
+
+  - id: t5_incident
+    timestamp: "14:01:45"
+    description: "Sustained degradation"
+    profile: incident
+
+# Expected detection results
+expected_results:
+  bisect:
+    first_bad: t3_spike_start
+    last_good: t2_normal
+
+  pattern:
+    id: FIFO_BACKPRESSURE
+    confidence_min: 0.80
+    primary_stage: risk
+
+  regression:
+    p99_baseline: 89
+    p99_incident: 142
+    delta_pct: 60
+
+# Fix verification
+fix:
+  template: fifo_backpressure
+  params:
+    BUFFER_DEPTH: 32
+    DATA_WIDTH: 64
+    CREDIT_THRESHOLD: 8
+
+  expected_improvement:
+    p99_after_fix: 94
+    improvement_pct: 34
