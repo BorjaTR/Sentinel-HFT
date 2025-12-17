@@ -220,11 +220,15 @@ if HAS_RICH:
         max_p99_regression: float = typer.Option(10.0, "--max-p99-regression", help="Max allowed P99 regression %"),
         fail_on_drops: bool = typer.Option(False, "--fail-on-drops", help="Fail if drops detected"),
         output: Optional[Path] = typer.Option(None, "-o", "--output", help="Output diff file"),
+        slack_webhook: Optional[str] = typer.Option(None, "--slack-webhook", envvar="SENTINEL_SLACK_WEBHOOK", help="Slack webhook URL (Pro)"),
+        slack_channel: Optional[str] = typer.Option("#alerts", "--slack-channel", help="Slack channel for alerts"),
     ):
         """
         Compare current metrics against baseline.
 
         Exit codes: 0=pass, 1=fail
+
+        Pro Feature: Add --slack-webhook to get alerts on regressions.
         """
         try:
             current_data = json.loads(current.read_text())
@@ -248,34 +252,65 @@ if HAS_RICH:
         else:
             regression_pct = 0 if current_p99 == 0 else 100
 
+        # Get additional metrics
+        current_p50 = current_data.get('latency', {}).get('p50_cycles', 0)
+        baseline_p50 = baseline_data.get('latency', {}).get('p50_cycles', 0)
+        current_p999 = current_data.get('latency', {}).get('p999_cycles', 0)
+        baseline_p999 = baseline_data.get('latency', {}).get('p999_cycles', 0)
+        baseline_drops = baseline_data.get('drops', {}).get('total_drops', 0)
+
+        # Calculate all deltas
+        def calc_delta(curr, base):
+            if base > 0:
+                return (curr - base) / base * 100
+            return 0 if curr == 0 else 100
+
+        p50_delta = calc_delta(current_p50, baseline_p50)
+        p999_delta = calc_delta(current_p999, baseline_p999)
+
         diff = {
-            'p99': {
-                'baseline': baseline_p99,
-                'current': current_p99,
-                'change_percent': round(regression_pct, 2),
-            },
-            'drops': {
-                'baseline': baseline_data.get('drops', {}).get('total_drops', 0),
-                'current': current_drops,
-            },
+            'p50': {'baseline': baseline_p50, 'current': current_p50, 'change_percent': round(p50_delta, 2)},
+            'p99': {'baseline': baseline_p99, 'current': current_p99, 'change_percent': round(regression_pct, 2)},
+            'p999': {'baseline': baseline_p999, 'current': current_p999, 'change_percent': round(p999_delta, 2)},
+            'drops': {'baseline': baseline_drops, 'current': current_drops},
         }
 
-        # Print report
+        # Print report header
         console.print()
         console.print(Panel.fit("[bold]REGRESSION REPORT[/]", border_style="blue"))
         console.print()
 
-        table = Table(show_header=True)
-        table.add_column("Metric")
-        table.add_column("Baseline", justify="right")
-        table.add_column("Current", justify="right")
-        table.add_column("Change", justify="right")
+        # Helper to format metric line with arrow and emoji
+        def format_metric(name: str, baseline: float, current: float, delta: float, threshold: float = None, unit: str = "ns"):
+            arrow = "→"
+            if threshold is not None:
+                if delta > threshold:
+                    status = "[red]🔴 REGRESS[/]"
+                elif delta > threshold * 0.5:
+                    status = "[yellow]⚠️  WARN[/]"
+                else:
+                    status = "[green]✅ OK[/]"
+            else:
+                if delta > 0:
+                    status = "[yellow]↑[/]"
+                elif delta < 0:
+                    status = "[green]↓[/]"
+                else:
+                    status = "[dim]=[/]"
 
-        style = "red" if regression_pct > max_p99_regression else "green"
-        table.add_row("P99", f"{baseline_p99}", f"{current_p99}", f"[{style}]{regression_pct:+.1f}%[/]")
-        table.add_row("Drops", str(diff['drops']['baseline']), str(current_drops), "")
+            delta_color = "red" if delta > 0 else "green" if delta < 0 else "dim"
+            return f"  {name:<6} {baseline:>6.0f}{unit} {arrow} {current:>6.0f}{unit}  [{delta_color}]({delta:+.1f}%)[/]  {status}"
 
-        console.print(table)
+        # Print metrics with nice format
+        console.print(format_metric("P50", baseline_p50, current_p50, p50_delta, threshold=max_p99_regression))
+        console.print(format_metric("P99", baseline_p99, current_p99, regression_pct, threshold=max_p99_regression))
+        console.print(format_metric("P99.9", baseline_p999, current_p999, p999_delta, threshold=max_p99_regression * 1.5))
+
+        # Drops line
+        if current_drops > 0 or baseline_drops > 0:
+            drop_status = "[red]🔴 DROPS[/]" if current_drops > baseline_drops else "[green]✅ OK[/]"
+            console.print(f"  {'Drops':<6} {baseline_drops:>6}    →  {current_drops:>6}       {drop_status}")
+
         console.print()
 
         # Check pass/fail
@@ -284,7 +319,7 @@ if HAS_RICH:
 
         if regression_pct > max_p99_regression:
             failed = True
-            reasons.append(f"P99 regression {regression_pct:.1f}% > {max_p99_regression}%")
+            reasons.append(f"P99 regression {regression_pct:.1f}% exceeds {max_p99_regression}% threshold")
 
         if fail_on_drops and current_drops > 0:
             failed = True
@@ -293,13 +328,41 @@ if HAS_RICH:
         if output:
             output.write_text(json.dumps(diff, indent=2))
 
+        # Send Slack alert on regression (Pro feature)
+        if failed and slack_webhook:
+            try:
+                from ..exporters.slack import SlackAlerter
+                alerter = SlackAlerter(webhook_url=slack_webhook, channel=slack_channel)
+                alerter.send_regression_alert(
+                    baseline_p99=baseline_p99,
+                    current_p99=current_p99,
+                    delta_pct=regression_pct,
+                )
+                console.print(f"[green]✓[/] Slack alert sent to {slack_channel}")
+            except Exception as e:
+                console.print(f"[yellow]⚠[/] Slack alert failed: {e}")
+        elif failed and not slack_webhook:
+            # Suggest Slack for free users
+            try:
+                from ..licensing import check_feature
+                if not check_feature("slack_alerts"):
+                    console.print()
+                    console.print("[dim]💡 Tip: Get Slack alerts on regressions with Pro[/]")
+                    console.print("[dim]   → sentinel-hft.com/pricing[/]")
+            except ImportError:
+                pass
+
+        # Final verdict
         if failed:
-            console.print("[bold red]FAILED[/]")
+            console.print()
+            console.print("[bold red]━━━ FAILED ━━━[/]")
             for r in reasons:
-                console.print(f"  - {r}")
+                console.print(f"  [red]✗[/] {r}")
+            console.print()
             raise typer.Exit(1)
         else:
-            console.print("[bold green]PASSED[/]")
+            console.print("[bold green]━━━ PASSED ━━━[/]")
+            console.print()
             raise typer.Exit(0)
 
 

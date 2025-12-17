@@ -257,3 +257,151 @@ class SlackAlerter:
             }],
         )
         return self.send_message(message)
+
+    def send_regression_alert(
+        self,
+        baseline_p99: float,
+        current_p99: float,
+        delta_pct: float,
+        regression_source: Optional[str] = None,
+        commit_sha: Optional[str] = None,
+        branch: Optional[str] = None,
+        force: bool = False,
+    ) -> bool:
+        """
+        Send regression alert.
+
+        Requires Pro license.
+
+        Args:
+            baseline_p99: Baseline P99 latency
+            current_p99: Current P99 latency
+            delta_pct: Percentage change
+            regression_source: Stage that caused regression (e.g., "core")
+            commit_sha: Git commit SHA
+            branch: Git branch name
+            force: Send regardless of cooldown
+
+        Returns:
+            True if alert was sent
+        """
+        # Check license
+        try:
+            from ..licensing import require_feature
+            require_feature("slack_alerts", "Slack regression alerts")
+        except ImportError:
+            pass  # Licensing module not available, allow
+
+        if not force and not self._can_send('regression'):
+            logger.debug("Skipping regression alert (cooldown)")
+            return False
+
+        # Build attachment fields
+        fields = [
+            {
+                'title': 'P99 Latency',
+                'value': f"{baseline_p99:.0f}ns → {current_p99:.0f}ns ({delta_pct:+.1f}%)",
+                'short': False,
+            },
+        ]
+
+        if regression_source:
+            fields.append({
+                'title': 'Regression Source',
+                'value': f"{regression_source.capitalize()} stage",
+                'short': True,
+            })
+
+        if commit_sha:
+            fields.append({
+                'title': 'Commit',
+                'value': commit_sha[:7] if len(commit_sha) > 7 else commit_sha,
+                'short': True,
+            })
+
+        if branch:
+            fields.append({
+                'title': 'Branch',
+                'value': branch,
+                'short': True,
+            })
+
+        # Build message
+        text = f"🔴 Latency Regression Detected"
+        if self.mention_on_critical:
+            text = f"{self.mention_on_critical} {text}"
+
+        message = SlackMessage(
+            channel=self.channel,
+            text=text,
+            icon_emoji=':rotating_light:',
+            attachments=[{
+                'color': 'danger',
+                'title': 'Regression Alert',
+                'text': f"P99 latency increased by {delta_pct:.1f}%",
+                'fields': fields,
+                'footer': 'Sentinel-HFT Regression Check',
+                'ts': int(time.time()),
+            }],
+        )
+
+        success = self.send_message(message)
+
+        if success:
+            self._record_send('regression')
+
+        return success
+
+    def send_budget_alert(
+        self,
+        metric: str,
+        current_value: float,
+        budget: float,
+        overage_pct: float,
+        force: bool = False,
+    ) -> bool:
+        """
+        Send budget exceeded alert.
+
+        Requires Pro license.
+
+        Args:
+            metric: Metric name (e.g., "P99")
+            current_value: Current metric value
+            budget: Budget threshold
+            overage_pct: Percentage over budget
+            force: Send regardless of cooldown
+
+        Returns:
+            True if alert was sent
+        """
+        # Check license
+        try:
+            from ..licensing import require_feature
+            require_feature("slack_alerts", "Slack budget alerts")
+        except ImportError:
+            pass
+
+        if not force and not self._can_send('budget'):
+            logger.debug("Skipping budget alert (cooldown)")
+            return False
+
+        message = SlackMessage(
+            channel=self.channel,
+            text=f"⚠️ {metric} Budget Exceeded",
+            icon_emoji=':warning:',
+            attachments=[{
+                'color': 'warning',
+                'title': f'{metric} Budget Alert',
+                'text': f"Current: {current_value:.0f}ns | Budget: {budget:.0f}ns | Overage: {overage_pct:+.1f}%",
+                'footer': 'Sentinel-HFT Budget Check',
+                'ts': int(time.time()),
+            }],
+        )
+
+        success = self.send_message(message)
+
+        if success:
+            self._record_send('budget')
+
+        return success
