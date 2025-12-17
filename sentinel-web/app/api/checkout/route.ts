@@ -1,6 +1,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server"
 import { NextResponse } from "next/server"
 import Stripe from "stripe"
+import { getPriceIdForTier, type Tier } from "@/lib/license"
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -8,13 +9,23 @@ function getStripe() {
   })
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { userId } = await auth()
     const user = await currentUser()
 
     if (!userId || !user) {
-      return NextResponse.redirect(new URL("/sign-in", process.env.NEXT_PUBLIC_APP_URL))
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+    }
+
+    // Get tier from query params
+    const url = new URL(request.url)
+    const tier = (url.searchParams.get("tier") || "pro") as Tier
+
+    // Get price ID for the tier
+    const priceId = getPriceIdForTier(tier)
+    if (!priceId) {
+      return NextResponse.json({ error: "Invalid tier" }, { status: 400 })
     }
 
     const stripe = getStripe()
@@ -40,18 +51,19 @@ export async function GET() {
       payment_method_types: ["card"],
       line_items: [
         {
-          price: process.env.STRIPE_PRO_PRICE_ID,
+          price: priceId,
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/analyze?upgraded=true`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?upgraded=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?canceled=true`,
       metadata: {
         clerkUserId: userId,
+        tier,
       },
     })
 
-    return NextResponse.redirect(session.url!)
+    return NextResponse.json({ url: session.url })
   } catch (error) {
     console.error("Checkout error:", error)
     return NextResponse.json({ error: "Failed to create checkout session" }, { status: 500 })

@@ -4,11 +4,12 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Github } from "lucide-react";
+import { Menu, X, Github, LayoutDashboard } from "lucide-react";
 import { Logo } from "./Logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AuthButtons } from "./AuthButtons";
+import { useAuth } from "@/hooks/useAuth";
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -21,6 +22,7 @@ export function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
+  const { isSignedIn } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -66,6 +68,20 @@ export function Navigation() {
           </div>
 
           <div className="flex items-center gap-3">
+            {isSignedIn && (
+              <Link
+                href="/dashboard"
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                  pathname === "/dashboard"
+                    ? "bg-sentinel-500/20 text-sentinel-400"
+                    : "text-gray-400 hover:text-white hover:bg-dark-border"
+                )}
+              >
+                <LayoutDashboard size={16} />
+                Dashboard
+              </Link>
+            )}
             <Button variant="ghost" size="sm" asChild>
               <a
                 href="https://github.com/BorjaTR/Sentinel-HFT"
@@ -116,6 +132,21 @@ export function Navigation() {
                     {link.label}
                   </Link>
                 ))}
+                {isSignedIn && (
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setIsOpen(false)}
+                    className={cn(
+                      "flex items-center gap-2 text-2xl font-medium transition-colors hover:text-sentinel-400",
+                      pathname === "/dashboard"
+                        ? "text-sentinel-400"
+                        : "text-gray-400"
+                    )}
+                  >
+                    <LayoutDashboard size={24} />
+                    Dashboard
+                  </Link>
+                )}
                 <div className="flex flex-col items-center gap-4 mt-8">
                   <Button variant="ghost" size="lg" asChild>
                     <a

@@ -1,26 +1,29 @@
 "use client"
 
+import { useState } from "react"
 import { motion } from "framer-motion"
-import { Check, X, Zap } from "lucide-react"
+import { Check, X, Zap, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/hooks/useAuth"
+import { useSubscription } from "@/hooks/useSubscription"
 import { Button } from "@/components/ui/button"
 
 const plans = [
   {
     name: "Free",
-    price: "€0",
+    price: "$0",
     period: "forever",
+    tier: "free",
     description: "Explore with demo data",
     features: [
       { text: "Pre-loaded demo traces", included: true },
       { text: "Full visualization", included: true },
-      { text: "Interactive fault injection", included: true },
-      { text: "Sample AI analysis", included: true },
-      { text: "Upload your own traces", included: false },
-      { text: "Live AI explanations", included: false },
-      { text: "Export reports", included: false },
-      { text: "API access", included: false },
+      { text: "Prescription previews (20 lines)", included: true },
+      { text: "CI exit codes", included: true },
+      { text: "Full prescription code", included: false },
+      { text: "Slack alerts", included: false },
+      { text: "CLI license key", included: false },
+      { text: "GitHub Action", included: false },
     ],
     cta: "Try Demo",
     ctaLink: "/demo",
@@ -28,34 +31,56 @@ const plans = [
   },
   {
     name: "Pro",
-    price: "€10",
+    price: "$99",
     period: "per month",
-    description: "Analyze your own systems",
+    tier: "pro",
+    description: "For individual engineers",
     features: [
       { text: "Everything in Free", included: true },
-      { text: "Upload your own traces", included: true },
-      { text: "Live AI explanations", included: true },
-      { text: "Export reports (JSON, PDF)", included: true },
+      { text: "Full prescription code + testbench", included: true },
+      { text: "Fix downloads (.sv files)", included: true },
+      { text: "Slack regression alerts", included: true },
+      { text: "CLI license key", included: true },
+      { text: "GitHub Action integration", included: true },
       { text: "API access", included: true },
       { text: "Priority support", included: true },
-      { text: "Unlimited analyses", included: true },
-      { text: "Team sharing (coming soon)", included: true },
     ],
     cta: "Subscribe",
-    ctaLink: "/api/checkout",
+    ctaLink: "/api/checkout?tier=pro",
     highlighted: true,
+  },
+  {
+    name: "Team",
+    price: "$499",
+    period: "per month",
+    tier: "team",
+    description: "For trading teams",
+    features: [
+      { text: "Everything in Pro", included: true },
+      { text: "Compliance PDF reports", included: true },
+      { text: "Custom patterns library", included: true },
+      { text: "5 team seats", included: true },
+      { text: "Team dashboard", included: true },
+      { text: "Audit trail", included: true },
+      { text: "Priority support", included: true },
+      { text: "Onboarding call", included: true },
+    ],
+    cta: "Subscribe",
+    ctaLink: "/api/checkout?tier=team",
+    highlighted: false,
   },
   {
     name: "Enterprise",
     price: "Custom",
     period: "contact us",
+    tier: "enterprise",
     description: "For trading firms",
     features: [
-      { text: "Everything in Pro", included: true },
+      { text: "Everything in Team", included: true },
       { text: "On-premise deployment", included: true },
       { text: "Custom integrations", included: true },
       { text: "SLA guarantee", included: true },
-      { text: "Dedicated support", included: true },
+      { text: "Unlimited seats", included: true },
       { text: "Training sessions", included: true },
       { text: "Source code access", included: true },
       { text: "Custom AI models", included: true },
@@ -68,6 +93,79 @@ const plans = [
 
 export default function PricingPage() {
   const { isSignedIn } = useAuth()
+  const { plan: currentPlan, isPro } = useSubscription()
+  const [loadingTier, setLoadingTier] = useState<string | null>(null)
+
+  const handleSubscribe = async (tier: string) => {
+    if (!isSignedIn) {
+      window.location.href = `/sign-up?redirect_url=/pricing`
+      return
+    }
+
+    setLoadingTier(tier)
+    try {
+      const res = await fetch(`/api/checkout?tier=${tier}`)
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      }
+    } catch (error) {
+      console.error("Checkout error:", error)
+    } finally {
+      setLoadingTier(null)
+    }
+  }
+
+  const getPlanButton = (plan: typeof plans[0]) => {
+    const isCurrentPlan = currentPlan === plan.tier
+    const isLoading = loadingTier === plan.tier
+
+    if (plan.tier === "free") {
+      return (
+        <Button asChild variant="outline" className="w-full" size="lg">
+          <Link href={plan.ctaLink}>{plan.cta}</Link>
+        </Button>
+      )
+    }
+
+    if (plan.tier === "enterprise") {
+      return (
+        <Button asChild variant="outline" className="w-full" size="lg">
+          <Link href={plan.ctaLink}>{plan.cta}</Link>
+        </Button>
+      )
+    }
+
+    if (isCurrentPlan) {
+      return (
+        <Button disabled className="w-full" size="lg">
+          Current Plan
+        </Button>
+      )
+    }
+
+    return (
+      <Button
+        onClick={() => handleSubscribe(plan.tier)}
+        disabled={isLoading}
+        className={`w-full ${
+          plan.highlighted
+            ? "bg-sentinel-500 hover:bg-sentinel-600"
+            : "bg-dark-border hover:bg-gray-700"
+        }`}
+        size="lg"
+      >
+        {isLoading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading...
+          </>
+        ) : (
+          plan.cta
+        )}
+      </Button>
+    )
+  }
 
   return (
     <div className="min-h-screen pt-24 pb-16">
@@ -87,7 +185,7 @@ export default function PricingPage() {
         </motion.div>
 
         {/* Pricing cards */}
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
           {plans.map((plan, i) => (
             <motion.div
               key={plan.name}
@@ -132,36 +230,7 @@ export default function PricingPage() {
                 ))}
               </ul>
 
-              {plan.name === "Pro" ? (
-                <Button
-                  asChild
-                  className={`w-full ${
-                    plan.highlighted
-                      ? "bg-sentinel-500 hover:bg-sentinel-600"
-                      : "bg-dark-border hover:bg-gray-700"
-                  }`}
-                  size="lg"
-                >
-                  {isSignedIn ? (
-                    <Link href="/api/checkout">{plan.cta}</Link>
-                  ) : (
-                    <Link href="/sign-up">{plan.cta}</Link>
-                  )}
-                </Button>
-              ) : (
-                <Button
-                  asChild
-                  variant={plan.highlighted ? "default" : "outline"}
-                  className={`w-full ${
-                    plan.highlighted
-                      ? "bg-sentinel-500 hover:bg-sentinel-600"
-                      : ""
-                  }`}
-                  size="lg"
-                >
-                  <Link href={plan.ctaLink}>{plan.cta}</Link>
-                </Button>
-              )}
+              {getPlanButton(plan)}
             </motion.div>
           ))}
         </div>
