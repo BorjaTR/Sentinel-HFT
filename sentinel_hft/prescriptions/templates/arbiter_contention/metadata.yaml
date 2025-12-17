@@ -1,0 +1,107 @@
+# Arbiter Contention FixPack Template Metadata
+# Pattern: ARBITER_CONTENTION
+# Version: 1.0.0
+
+id: "arbiter_contention_weighted_rr"
+name: "Weighted Round-Robin Arbiter"
+version: "1.0.0"
+pattern_id: "ARBITER_CONTENTION"
+
+description: |
+  Weighted round-robin arbiter with priority escalation for fair access
+  to shared resources. Prevents starvation while respecting traffic priorities.
+
+problem_statement: |
+  Multiple requesters competing for a shared resource cause variable latency
+  due to arbitration delays. Simple round-robin doesn't account for traffic
+  priorities, leading to suboptimal throughput for high-priority flows.
+
+solution_approach: |
+  Implement weighted round-robin with configurable weights per port.
+  Add priority escalation to prevent starvation of low-priority requesters.
+  Include bypass path for single-requester scenarios to minimize latency.
+
+parameters:
+  - name: NUM_PORTS
+    description: "Number of requester ports"
+    type: int
+    default: 4
+    min_value: 2
+    max_value: 16
+
+  - name: DATA_WIDTH
+    description: "Data path width in bits"
+    type: int
+    default: 64
+    min_value: 8
+    max_value: 512
+
+  - name: WEIGHT_WIDTH
+    description: "Bits for weight counter"
+    type: int
+    default: 4
+    min_value: 2
+    max_value: 8
+
+  - name: ENABLE_PRIORITY_ESCALATION
+    description: "Enable starvation prevention"
+    type: bool
+    default: true
+
+  - name: ESCALATION_THRESHOLD
+    description: "Cycles before priority boost"
+    type: int
+    default: 64
+    min_value: 8
+    max_value: 256
+
+  - name: SINGLE_CYCLE_GRANT
+    description: "Combinational grant for single requester"
+    type: bool
+    default: true
+
+fpga_resources:
+  - vendor: xilinx
+    family: "ultrascale+"
+    luts: 180
+    ffs: 120
+    bram_18k: 0
+    bram_36k: 0
+    dsp: 0
+    max_freq_mhz: 500
+    latency_cycles: 1
+    notes: "4-port configuration, minimal logic"
+
+  - vendor: intel
+    family: "agilex"
+    luts: 200
+    ffs: 130
+    bram_18k: 0
+    bram_36k: 0
+    dsp: 0
+    max_freq_mhz: 450
+    latency_cycles: 1
+    notes: "4-port configuration"
+
+expected_latency_reduction_pct: 25.0
+expected_throughput_improvement_pct: 15.0
+confidence_range: [60, 85]
+
+rtl_template: "weighted_rr_arbiter.sv.j2"
+testbench_template: "weighted_rr_arbiter_tb.sv.j2"
+integration_guide_template: "integration_guide.md.j2"
+
+prerequisites:
+  - "Requesters must hold request until grant"
+  - "Data must be valid when request is asserted"
+
+breaking_changes:
+  - "Interface changes from simple request/grant to weighted protocol"
+  - "Requires weight configuration during initialization"
+
+known_limitations:
+  - "Maximum 16 ports in current implementation"
+  - "Weight changes require reset to take effect"
+
+min_test_vectors: 2000
+recommended_test_duration_ms: 200

@@ -1,0 +1,110 @@
+# Clock Domain Crossing FixPack Template Metadata
+# Pattern: CLOCK_DOMAIN_CROSSING
+# Version: 1.0.0
+
+id: "cdc_async_fifo"
+name: "Asynchronous FIFO with Gray Code Pointers"
+version: "1.0.0"
+pattern_id: "CLOCK_DOMAIN_CROSSING"
+
+description: |
+  Asynchronous FIFO for safe clock domain crossing with gray-code pointers
+  and proper synchronization. Optimized for low latency in HFT applications.
+
+problem_statement: |
+  Data crossing between clock domains without proper synchronization causes
+  metastability and data corruption. Standard synchronizers add latency.
+  Incorrect CDC design is a common source of hard-to-debug failures.
+
+solution_approach: |
+  Implement dual-clock FIFO with gray-coded pointers for safe comparison
+  across domains. Uses multi-flop synchronizers with ASYNC_REG constraints.
+  Includes almost-full/empty signals for flow control without full latency.
+
+parameters:
+  - name: DATA_WIDTH
+    description: "Data path width in bits"
+    type: int
+    default: 64
+    min_value: 1
+    max_value: 512
+
+  - name: DEPTH
+    description: "FIFO depth (must be power of 2)"
+    type: int
+    default: 16
+    min_value: 4
+    max_value: 256
+
+  - name: SYNC_STAGES
+    description: "Synchronizer flip-flop stages"
+    type: int
+    default: 2
+    min_value: 2
+    max_value: 4
+
+  - name: ALMOST_FULL_THRESHOLD
+    description: "Entries remaining when almost_full asserts"
+    type: int
+    default: 4
+    min_value: 1
+    max_value: 32
+
+  - name: ALMOST_EMPTY_THRESHOLD
+    description: "Entries present when almost_empty asserts"
+    type: int
+    default: 2
+    min_value: 1
+    max_value: 32
+
+  - name: OUTPUT_REG
+    description: "Register FIFO output for timing"
+    type: bool
+    default: false
+
+fpga_resources:
+  - vendor: xilinx
+    family: "ultrascale+"
+    luts: 150
+    ffs: 200
+    bram_18k: 1
+    bram_36k: 0
+    dsp: 0
+    max_freq_mhz: 500
+    latency_cycles: 3
+    notes: "16-deep, 64-bit, 2-stage sync (3 cycle latency = 2 sync + 1 read)"
+
+  - vendor: intel
+    family: "agilex"
+    luts: 160
+    ffs: 210
+    bram_18k: 1
+    bram_36k: 0
+    dsp: 0
+    max_freq_mhz: 450
+    latency_cycles: 3
+    notes: "16-deep, 64-bit, 2-stage sync"
+
+expected_latency_reduction_pct: 20.0
+expected_throughput_improvement_pct: 15.0
+confidence_range: [65, 90]
+
+rtl_template: "async_fifo.sv.j2"
+testbench_template: "async_fifo_tb.sv.j2"
+integration_guide_template: "integration_guide.md.j2"
+
+prerequisites:
+  - "Both clock domains must be stable and running"
+  - "Reset must be synchronized to both domains"
+
+breaking_changes:
+  - "Minimum latency is SYNC_STAGES + 1 cycles"
+  - "FIFO depth must be power of 2"
+
+known_limitations:
+  - "Gray code requires power-of-2 depth"
+  - "Full/empty flags are conservative (may indicate full/empty slightly early)"
+  - "Reset must be held for SYNC_STAGES cycles in slower domain"
+
+min_test_vectors: 2000
+recommended_test_duration_ms: 200

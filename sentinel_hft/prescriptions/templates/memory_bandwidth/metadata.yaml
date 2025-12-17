@@ -1,0 +1,121 @@
+# Memory Bandwidth FixPack Template Metadata
+# Pattern: MEMORY_BANDWIDTH
+# Version: 1.0.0
+
+id: "memory_bandwidth_prefetch"
+name: "Prefetch Buffer with Stride Detection"
+version: "1.0.0"
+pattern_id: "MEMORY_BANDWIDTH"
+
+description: |
+  Prefetch buffer with automatic stride detection to hide memory latency.
+  Predicts access patterns and issues speculative reads ahead of demand.
+
+problem_statement: |
+  Memory access latency dominates when waiting for external DRAM or HBM.
+  Sequential or strided access patterns are predictable but still incur
+  full latency penalty without prefetching.
+
+solution_approach: |
+  Implement stride-detecting prefetch buffer that learns access patterns
+  and issues speculative reads. Uses confidence tracking to avoid
+  polluting cache with bad prefetches. Integrates with AXI memory interface.
+
+parameters:
+  - name: DATA_WIDTH
+    description: "Memory data width in bits"
+    type: int
+    default: 512
+    min_value: 64
+    max_value: 1024
+
+  - name: ADDR_WIDTH
+    description: "Address width in bits"
+    type: int
+    default: 40
+    min_value: 32
+    max_value: 64
+
+  - name: PREFETCH_DEPTH
+    description: "Number of prefetch entries"
+    type: int
+    default: 8
+    min_value: 4
+    max_value: 32
+
+  - name: STRIDE_HISTORY
+    description: "Number of accesses to learn stride"
+    type: int
+    default: 4
+    min_value: 2
+    max_value: 8
+
+  - name: CONFIDENCE_THRESHOLD
+    description: "Min confidence to prefetch (0-15)"
+    type: int
+    default: 8
+    min_value: 4
+    max_value: 15
+
+  - name: MAX_OUTSTANDING
+    description: "Maximum outstanding prefetch requests"
+    type: int
+    default: 4
+    min_value: 1
+    max_value: 16
+
+  - name: AXI_ID_WIDTH
+    description: "AXI ID width for tagging"
+    type: int
+    default: 4
+    min_value: 1
+    max_value: 8
+
+fpga_resources:
+  - vendor: xilinx
+    family: "ultrascale+"
+    luts: 800
+    ffs: 600
+    bram_18k: 4
+    bram_36k: 0
+    dsp: 0
+    uram: 0
+    max_freq_mhz: 400
+    latency_cycles: 2
+    notes: "8-entry prefetch buffer, 512b data"
+
+  - vendor: intel
+    family: "agilex"
+    luts: 850
+    ffs: 620
+    bram_18k: 4
+    bram_36k: 0
+    dsp: 0
+    max_freq_mhz: 380
+    latency_cycles: 2
+    notes: "8-entry prefetch buffer, 512b data"
+
+expected_latency_reduction_pct: 40.0
+expected_throughput_improvement_pct: 35.0
+confidence_range: [50, 75]
+
+rtl_template: "prefetch_buffer.sv.j2"
+testbench_template: "prefetch_buffer_tb.sv.j2"
+integration_guide_template: "integration_guide.md.j2"
+
+prerequisites:
+  - "AXI4 memory interface"
+  - "Predictable memory access patterns (sequential/strided)"
+  - "Sufficient memory bandwidth headroom for speculative reads"
+
+breaking_changes:
+  - "Additional memory bandwidth consumption from prefetches"
+  - "Requires AXI ID management for outstanding requests"
+
+known_limitations:
+  - "Random access patterns see no benefit"
+  - "May increase power due to speculative reads"
+  - "Prefetch buffer uses BRAM resources"
+
+min_test_vectors: 3000
+recommended_test_duration_ms: 300

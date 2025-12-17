@@ -1,0 +1,92 @@
+id: fifo_backpressure_elastic_buffer
+name: "Elastic Buffer with Credit-Based Flow Control"
+version: "1.0.0"
+pattern_id: fifo_backpressure
+
+description: |
+  Implements a credit-based flow control buffer that absorbs downstream
+  backpressure without stalling the upstream pipeline. Uses an elastic
+  buffer with configurable depth and credit signaling.
+
+problem_statement: |
+  Downstream stalls (e.g., from risk checks or egress) propagate upstream,
+  causing pipeline bubbles and increased P99 latency. The upstream stage
+  must wait even when it has valid data ready.
+
+solution_approach: |
+  Insert an elastic buffer between stages with credit-based flow control.
+  The buffer absorbs short bursts of backpressure. Credits prevent overflow
+  without requiring ready signal propagation through the critical path.
+
+parameters:
+  - name: BUFFER_DEPTH
+    description: "Depth of elastic buffer (power of 2)"
+    type: int
+    default: 16
+    min_value: 4
+    max_value: 256
+
+  - name: DATA_WIDTH
+    description: "Width of data path in bits"
+    type: int
+    default: 64
+    min_value: 8
+    max_value: 512
+
+  - name: CREDIT_THRESHOLD
+    description: "Credits below this trigger backpressure"
+    type: int
+    default: 4
+    min_value: 1
+    max_value: 64
+
+  - name: REGISTER_OUTPUT
+    description: "Add output register for timing closure"
+    type: bool
+    default: true
+
+fpga_resources:
+  - vendor: xilinx
+    family: "ultrascale+"
+    luts: 89
+    ffs: 124
+    bram_18k: 1
+    bram_36k: 0
+    dsp: 0
+    max_freq_mhz: 450
+    latency_cycles: 2
+    notes: "Uses FIFO36E2 primitive in FWFT mode"
+
+  - vendor: intel
+    family: "agilex"
+    luts: 95
+    ffs: 130
+    bram_18k: 0
+    bram_36k: 0
+    dsp: 0
+    max_freq_mhz: 400
+    latency_cycles: 2
+    notes: "Uses M20K in simple dual-port mode"
+
+expected_latency_reduction_pct: 25
+expected_throughput_improvement_pct: 15
+confidence_range: [0.75, 0.95]
+
+rtl_template: "elastic_buffer.sv.j2"
+testbench_template: "elastic_buffer_tb.sv.j2"
+integration_guide_template: "integration_guide.md.j2"
+
+prerequisites:
+  - "Downstream module must support ready/valid handshake"
+  - "Clock frequency must be consistent between stages"
+
+breaking_changes:
+  - "Adds 2 cycles of latency in the path"
+  - "Requires additional BRAM resource"
+
+known_limitations:
+  - "Does not help if backpressure exceeds buffer depth"
+  - "Credit return path adds small amount of logic"
+
+min_test_vectors: 10000
+recommended_test_duration_ms: 500
