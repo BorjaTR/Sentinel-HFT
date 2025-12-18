@@ -6,14 +6,14 @@
 
 **Hardware execution observability for crypto trading infrastructure.**
 
-Sentinel-HFT wraps your FPGA trading cores with instrumentation, captures cycle-accurate traces, enforces risk controls, and generates AI-powered latency analysis reports. It provides comprehensive tooling for latency verification, regression testing, fault injection, and real-time monitoring.
+Sentinel-HFT wraps your FPGA trading cores with instrumentation, captures cycle-accurate traces, enforces risk controls, and generates AI-powered latency analysis reports. It provides comprehensive tooling for latency verification, regression testing, pattern detection, fix generation, and real-time monitoring.
 
 ### Who Is This For?
 
 - **Crypto HFT firms** — Debug and optimize FPGA execution paths
 - **MEV searchers** — Understand latency in transaction ordering
 - **L2 sequencers** — Analyze sequencer performance
-- **FPGA engineers** — Verify RTL timing behavior
+- **FPGA engineers** — Verify RTL timing behavior, get RTL fix templates
 - **Quant developers** — Regression test trading systems
 
 ---
@@ -23,13 +23,17 @@ Sentinel-HFT wraps your FPGA trading cores with instrumentation, captures cycle-
 - [Features](#features)
 - [Performance](#performance)
 - [Quick Start](#quick-start)
+- [End-to-End Demo](#end-to-end-demo)
 - [Installation](#installation)
 - [Core Features](#core-features)
   - [Trace Analysis](#1-trace-analysis)
   - [Latency Attribution](#2-latency-attribution-v12)
-  - [Fault Injection](#3-fault-injection-testing)
-  - [Risk Controls](#4-risk-controls)
-  - [AI Explanations](#5-ai-powered-explanations)
+  - [Pattern Detection & Fix Generation](#3-pattern-detection--fix-generation)
+  - [Trace Bisect](#4-trace-bisect)
+  - [Benchmark History](#5-benchmark-history)
+  - [Fault Injection](#6-fault-injection-testing)
+  - [Risk Controls](#7-risk-controls)
+  - [AI Explanations](#8-ai-powered-explanations)
 - [Integration](#integration)
   - [CLI](#command-line-interface)
   - [Python API](#python-api)
@@ -41,6 +45,7 @@ Sentinel-HFT wraps your FPGA trading cores with instrumentation, captures cycle-
 - [Trace Formats](#trace-formats)
 - [Architecture](#architecture)
 - [Development](#development)
+- [Testing](#testing)
 - [License](#license)
 
 ---
@@ -51,9 +56,14 @@ Sentinel-HFT wraps your FPGA trading cores with instrumentation, captures cycle-
 |---------|-------------|
 | **Cycle-accurate instrumentation** | Non-invasive RTL wrapper captures every transaction with nanosecond precision |
 | **Latency attribution** | v1.2 format breaks down latency by pipeline stage (ingress/core/risk/egress) |
+| **Pattern detection** | Automatically detect FIFO backpressure, arbiter contention, memory bandwidth issues |
+| **RTL fix generation** | Generate SystemVerilog fix templates with testbenches for detected patterns |
+| **Trace bisect** | Binary search through trace files to find exact regression point |
+| **Benchmark history** | Track latency metrics over time with stability scoring |
 | **Streaming analysis** | Process millions of traces with O(1) memory using quantile estimation |
 | **Fault injection** | 8 fault types with built-in scenarios for resilience testing |
 | **Risk controls** | Hardware rate limiter, position limits, and kill switch |
+| **Protocol awareness** | FIX and ITCH protocol message correlation |
 | **AI explanations** | Natural language root cause analysis using Claude |
 | **Real-time monitoring** | HTTP server with Prometheus metrics and Grafana dashboards |
 | **CI/CD integration** | GitHub Actions, regression testing, and automated alerts |
@@ -86,8 +96,8 @@ Records dropped:   0
 # Install
 pip install -e ".[all]"
 
-# Run interactive demo
-sentinel-hft demo
+# Run end-to-end demo (shows complete workflow)
+sentinel-hft demo-e2e
 
 # Check installed features
 sentinel-hft version -v
@@ -95,10 +105,47 @@ sentinel-hft version -v
 # Analyze trace file
 sentinel-hft analyze traces.bin -o report.json
 
+# Detect patterns and generate fixes
+sentinel-hft prescribe traces.bin --export ./fix
+
+# Check for regressions
+sentinel-hft regression current.json baseline.json
+
 # Start monitoring server
 docker-compose up -d sentinel-server prometheus grafana
 # Open http://localhost:3000 (admin/sentinel)
 ```
+
+---
+
+## End-to-End Demo
+
+The demo showcases a realistic FOMC announcement scenario where market data spikes 8x:
+
+```bash
+# Interactive demo with step-by-step walkthrough
+sentinel-hft demo-e2e
+
+# Non-interactive (for CI/automation)
+sentinel-hft demo-e2e --non-interactive
+
+# Custom output directory
+sentinel-hft demo-e2e -o ./my_demo
+```
+
+**Demo Story:**
+> "FOMC announcement hits. Message rate spikes 8x. Your P99 jumps from 89ns to 142ns. Sentinel finds the problem, identifies the pattern, generates the fix, and proves it works."
+
+**The 6-step workflow:**
+
+| Step | Description | Output |
+|------|-------------|--------|
+| 1. Analyze baseline | Normal operation metrics | P99 = 89ns |
+| 2. Analyze incident | Incident metrics | P99 = 142ns (+60%) |
+| 3. Bisect | Find regression point | t3_spike_start.bin |
+| 4. Detect pattern | Identify root cause | FIFO_BACKPRESSURE (87%) |
+| 5. Generate fix | RTL template | elastic_buffer.sv |
+| 6. Verify | Testbench simulation | P99 → 94ns (-34%) |
 
 ---
 
@@ -232,7 +279,138 @@ print(f"\nOverall bottleneck: {metrics.bottleneck} ({metrics.bottleneck_pct:.1%}
 
 ---
 
-### 3. Fault Injection Testing
+### 3. Pattern Detection & Fix Generation
+
+Automatically detect latency patterns and generate RTL fixes.
+
+**Detect Patterns:**
+
+```bash
+sentinel-hft prescribe traces.bin
+```
+
+**Output:**
+```
+Pattern Analysis
+==================================================
+
+#1 FIFO_BACKPRESSURE
+   Confidence: 87% (high)
+   Stage: risk
+
+   Evidence:
+     + Risk stage contributes 65% of total latency
+     + High variance in risk timing (std/mean > 0.3)
+     + Burst patterns detected in ingress timing
+
+#2 ARBITER_CONTENTION
+   Confidence: 42% (medium)
+   Stage: core
+```
+
+**Supported Patterns:**
+
+| Pattern | Description | Fix Template |
+|---------|-------------|--------------|
+| `FIFO_BACKPRESSURE` | FIFO buffer filling up | Elastic buffer with credit flow |
+| `ARBITER_CONTENTION` | Multiple requesters competing | Round-robin arbiter |
+| `MEMORY_BANDWIDTH` | DDR/HBM saturation | Cache optimization |
+
+**Generate Fix Pack:**
+
+```bash
+sentinel-hft prescribe traces.bin --export ./fix
+```
+
+This generates:
+```
+./fix/
+  elastic_buffer.sv       # RTL fix template
+  elastic_buffer_tb.sv    # Testbench
+  INTEGRATION_GUIDE.md    # Integration instructions
+  fixpack_summary.json    # Metadata
+```
+
+**Verify Fix:**
+
+```bash
+sentinel-hft verify ./fix --trace traces.bin
+```
+
+---
+
+### 4. Trace Bisect
+
+Find exactly when a regression was introduced using binary search:
+
+```bash
+sentinel-hft bisect traces/ --metric p99 --threshold 0.10
+```
+
+**Output:**
+```
+Found 5 trace files
+Baseline P99: 89ns (t1_normal.bin)
+
+  Step 1: Testing t3_spike_start.bin... regression
+  Step 2: Testing t2_normal.bin... ok
+
+Found in 2 steps
+
+Regression Identified
+=======================================================
+  Last good:  t2_normal.bin
+  First bad:  t3_spike_start.bin
+
+Impact:
+  P99: 89ns -> 142ns (+59.6%)
+
+Stage Attribution:
+  | Stage    | Before | After  | Delta   | Share  |
+  |----------|--------|--------|---------|--------|
+  | Ingress  | 12ns   | 14ns   | +16.7%  |        |
+  | Core     | 25ns   | 28ns   | +12.0%  |        |
+  | Risk     | 31ns   | 78ns   | +151.6% | SOURCE |
+  | Egress   | 18ns   | 22ns   | +22.2%  |        |
+
+Pattern Match:
+  FIFO_BACKPRESSURE (87% confidence)
+```
+
+---
+
+### 5. Benchmark History
+
+Track latency metrics over time:
+
+```bash
+# Record a benchmark
+sentinel-hft benchmark record traces.bin --name v2.3.0-release
+
+# View history
+sentinel-hft benchmark history --days 30
+
+# Compare to baseline
+sentinel-hft benchmark compare v2.3.0-release current.bin
+```
+
+**History Output:**
+```
+Benchmark History (last 30 days)
+=======================================================
+
+  Current P99: 142ns
+  30-day average: 115ns
+  Best: 89ns
+  Worst: 142ns
+
+  Stability Score: 45/100
+  Trend: degrading
+```
+
+---
+
+### 6. Fault Injection Testing
 
 Test system resilience with 8 configurable fault types:
 
@@ -292,7 +470,7 @@ custom = FaultScenario(
 
 ---
 
-### 4. Risk Controls
+### 7. Risk Controls
 
 Hardware-enforced risk controls in RTL:
 
@@ -320,7 +498,7 @@ risk_gate #(
 
 ---
 
-### 5. AI-Powered Explanations
+### 8. AI-Powered Explanations
 
 Get natural language analysis of latency patterns using Claude:
 
@@ -366,6 +544,29 @@ sentinel-hft regression <current> <baseline> [OPTIONS]
   --max-p99-regression FLOAT  Max allowed P99 regression %
   --fail-on-drops            Fail if drops detected
 
+# Pattern detection & fix generation
+sentinel-hft prescribe <trace_file> [OPTIONS]
+  --export PATH          Export fix to directory
+  --top N                Show top N patterns
+  --min-confidence FLOAT Minimum confidence threshold
+
+# Fix verification
+sentinel-hft verify <fix_dir> [OPTIONS]
+  --trace PATH           Original trace file for projection
+
+# Trace bisect
+sentinel-hft bisect <trace_dir> [OPTIONS]
+  --metric [p50|p99|p999] Metric to bisect on
+  --threshold FLOAT       Regression threshold (default 10%)
+  --baseline PATH         Explicit baseline trace
+
+# Benchmark history
+sentinel-hft benchmark record <trace_file> [OPTIONS]
+  --name NAME            Baseline name
+  --tag TAG              Add tags (can repeat)
+sentinel-hft benchmark history [--days N] [--metric p99]
+sentinel-hft benchmark compare <baseline_name> <trace_file>
+
 # Live monitoring
 sentinel-hft live [OPTIONS]
   --udp-port INT         UDP port for traces
@@ -378,6 +579,9 @@ sentinel-hft config validate <path>   # Validate config file
 sentinel-hft config dump [path]       # Dump current config
 
 # Demo & Info
+sentinel-hft demo-e2e                 # Full end-to-end demo
+sentinel-hft demo-e2e --non-interactive
+sentinel-hft demo-setup -o PATH       # Generate demo data only
 sentinel-hft demo [-o PATH]           # Run interactive demo
 sentinel-hft version [-v]             # Show version info
 ```
@@ -855,6 +1059,63 @@ class FaultType(str, Enum):
 1. Add to `sentinel_hft/streaming/analyzer.py`
 2. Update `sentinel_hft/exporters/prometheus.py`
 3. Add to Grafana dashboard in `monitoring/grafana/dashboards/`
+
+---
+
+## Testing
+
+### Developer Test Script
+
+Run the comprehensive feature verification script:
+
+```bash
+python scripts/test_all.py
+```
+
+This tests all 11 feature areas in ~60 seconds:
+
+| Section | Tests |
+|---------|-------|
+| 1. Basic CLI | `--help`, version |
+| 2. Demo Data | Generate traces, verify files |
+| 3. Trace Analysis | Analyze baseline/incident |
+| 4. Regression | Detect regression, thresholds |
+| 5. Pattern Detection | FIFO_BACKPRESSURE detection |
+| 6. Fix Generation | RTL, testbench, integration guide |
+| 7. Fix Verification | Testbench simulation |
+| 8. Bisect | Find regression point |
+| 9. Benchmark | Record, history, compare |
+| 10. E2E Demo | Non-interactive demo |
+| 11. Edge Cases | Invalid files, missing args |
+
+### Quick Manual Tests
+
+```bash
+# Generate test data
+python -m sentinel_hft.cli.main demo-setup -o /tmp/test
+
+# Quick analysis
+python -m sentinel_hft.cli.main analyze /tmp/test/traces/baseline.bin
+
+# Quick regression (should fail)
+python -m sentinel_hft.cli.main regression \
+  /tmp/test/traces/incident.bin \
+  /tmp/test/traces/baseline.bin
+
+# Full demo
+python -m sentinel_hft.cli.main demo-e2e --non-interactive
+```
+
+### Unit Tests
+
+```bash
+pytest tests/ -v
+```
+
+### Documentation
+
+- **Testing Guide:** See `TESTING_GUIDE.md` for detailed testing instructions
+- **Integration Guide:** See `docs/INTEGRATION_GUIDE.md` for company integration
 
 ---
 
