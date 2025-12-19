@@ -60,11 +60,13 @@ class DemoRunner:
         self,
         scenario_id: str = 'fomc_backpressure',
         output_dir: Optional[Path] = None,
-        verbose: bool = True
+        verbose: bool = True,
+        seed: Optional[int] = None
     ):
         self.scenario_id = scenario_id
         self.output_dir = output_dir or Path.home() / '.sentinel-hft' / 'demo' / scenario_id
         self.verbose = verbose
+        self.seed = seed if seed is not None else 42
         self.scenario = None
         self.trace_files = None
 
@@ -91,7 +93,7 @@ class DemoRunner:
         self.trace_files = generate_scenario_traces(
             self.scenario,
             traces_dir,
-            seed=42
+            seed=self.seed
         )
         elapsed = time.time() - start
 

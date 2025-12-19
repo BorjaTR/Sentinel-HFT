@@ -793,6 +793,7 @@ if HAS_RICH:
     def demo_setup(
         scenario: str = typer.Option("fomc_backpressure", "-s", "--scenario", help="Demo scenario"),
         output: Path = typer.Option(..., "-o", "--output", help="Output directory"),
+        seed: Optional[int] = typer.Option(None, "--seed", help="Random seed for reproducibility"),
     ):
         """
         Set up demo scenario without running.
@@ -803,6 +804,7 @@ if HAS_RICH:
 
         \b
           sentinel-hft demo-setup -o ./demo_data
+          sentinel-hft demo-setup -o ./demo_data --seed 12345
           sentinel-hft analyze ./demo_data/traces/baseline.bin
         """
         from ..demo.runner import DemoRunner
@@ -810,7 +812,8 @@ if HAS_RICH:
         runner = DemoRunner(
             scenario_id=scenario,
             output_dir=Path(output),
-            verbose=True
+            verbose=True,
+            seed=seed
         )
 
         runner.setup()

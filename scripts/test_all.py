@@ -5,6 +5,8 @@ Sentinel-HFT Feature Verification Script
 Run: python scripts/test_all.py
 Pass: All checks green, exit 0
 Fail: Any check red, exit 1
+
+Use --seed N to set random seed, or omit for random seed each run.
 """
 
 import subprocess
@@ -12,6 +14,8 @@ import sys
 import tempfile
 import json
 import shutil
+import random
+import time
 from pathlib import Path
 
 # Colors
@@ -128,6 +132,20 @@ class TestRunner:
 
 
 def main():
+    # Parse command line for optional seed
+    seed = None
+    if "--seed" in sys.argv:
+        idx = sys.argv.index("--seed")
+        if idx + 1 < len(sys.argv):
+            seed = int(sys.argv[idx + 1])
+
+    # Generate random seed if not provided
+    if seed is None:
+        seed = random.randint(1, 1000000)
+
+    print(f"\n{BOLD}Random seed: {seed}{RESET}")
+    print(f"(Use --seed {seed} to reproduce this run)\n")
+
     t = TestRunner()
     temp = t.setup()
 
@@ -149,7 +167,7 @@ def main():
     t.section("2. Demo Data Generation")
 
     demo_dir = temp / "demo"
-    t.run("Generate demo data", CLI + ["demo-setup", "-o", str(demo_dir)])
+    t.run("Generate demo data", CLI + ["demo-setup", "-o", str(demo_dir), "--seed", str(seed)])
 
     # Verify files were created
     baseline = demo_dir / "traces" / "baseline.bin"
