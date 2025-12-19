@@ -10,6 +10,7 @@ from typing import Optional, Tuple, Union
 
 from .base import TraceAdapter, StandardTrace
 from .sentinel_adapter import SentinelV10Adapter, SentinelV11Adapter
+from .sentinel_adapter_v12 import SentinelV12Adapter
 from .csv_adapter import CSVAdapter
 
 # Import from formats package
@@ -22,7 +23,7 @@ def auto_detect(path: Union[Path, str]) -> Tuple[TraceAdapter, Optional[FileHead
 
     Detection order:
     1. CSV files by extension (.csv)
-    2. Files with SNTL magic header (v1.1 format)
+    2. Files with SNTL magic header (v1.0/v1.1/v1.2 format)
     3. Legacy binary files (v1.0 format, 32-byte records)
 
     Args:
@@ -48,11 +49,17 @@ def auto_detect(path: Union[Path, str]) -> Tuple[TraceAdapter, Optional[FileHead
 
     if header:
         # Modern format with header
-        if header.version == 1 and header.record_size == 48:
+        if header.version == 2 and header.record_size == 64:
+            # v1.2 format with 64-byte records
+            return SentinelV12Adapter(clock_mhz=header.clock_mhz), header
+        elif header.version == 1 and header.record_size == 48:
             return SentinelV11Adapter(), header
         elif header.version == 1 and header.record_size == 32:
             # Hypothetical: header with v1.0 records
             return SentinelV10Adapter(), header
+        elif header.record_size == 64:
+            # Any version with 64-byte records -> use v1.2 adapter
+            return SentinelV12Adapter(clock_mhz=header.clock_mhz), header
         else:
             raise ValueError(
                 f"Unknown format: version={header.version}, "
@@ -79,6 +86,7 @@ __all__ = [
     'StandardTrace',
     'SentinelV10Adapter',
     'SentinelV11Adapter',
+    'SentinelV12Adapter',
     'CSVAdapter',
     'auto_detect',
 ]

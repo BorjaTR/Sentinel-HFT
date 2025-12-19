@@ -81,33 +81,54 @@ class TraceRecord:
         return self.t_egress - self.t_risk
 
     def to_bytes(self) -> bytes:
-        """Serialize to binary format (64 bytes)."""
-        # Format matches v1.2: stage timestamps + metadata
+        """Serialize to binary format (64 bytes) matching V12 spec."""
+        # V12 format: <BBHIQQQHH12xIIII
+        # version, record_type, core_id, seq_no, t_ingress, t_egress, t_host,
+        # tx_id, flags, reserved(12), d_ingress, d_core, d_risk, d_egress
+
+        # Calculate stage deltas in cycles (nanoseconds here, treated as cycles at 1GHz)
+        d_ingress = self.t_core - self.t_ingress
+        d_core = self.t_risk - self.t_core
+        d_risk = self.t_egress - self.t_risk
+        d_egress = 0  # No separate egress in our model
+
         return struct.pack(
-            '<QQ QQQQ II 16x',
-            self.seq_id,
-            self.timestamp_ns,
-            self.t_ingress,
-            self.t_core,
-            self.t_risk,
-            self.t_egress,
-            self.message_type,
-            self.flags,
+            '<BBHIQQQHH12xIIII',
+            2,                  # version
+            1,                  # record_type (TX_EVENT)
+            0,                  # core_id
+            self.seq_id,        # seq_no
+            self.t_ingress,     # t_ingress
+            self.t_egress,      # t_egress
+            self.timestamp_ns,  # t_host
+            self.seq_id % 65536,  # tx_id
+            self.flags,         # flags
+            d_ingress,          # d_ingress
+            d_core,             # d_core
+            d_risk,             # d_risk
+            d_egress,           # d_egress
         )
 
     @classmethod
     def from_bytes(cls, data: bytes) -> 'TraceRecord':
         """Deserialize from binary format."""
-        unpacked = struct.unpack('<QQ QQQQ II', data[:48])
+        # V12 format: <BBHIQQQHH12xIIII
+        unpacked = struct.unpack('<BBHIQQQHH12xIIII', data[:64])
+        version, record_type, core_id, seq_no, t_ingress, t_egress, t_host, tx_id, flags, d_ingress, d_core, d_risk, d_egress = unpacked
+
+        # Reconstruct stage timestamps from deltas
+        t_core = t_ingress + d_ingress
+        t_risk = t_core + d_core
+
         return cls(
-            seq_id=unpacked[0],
-            timestamp_ns=unpacked[1],
-            t_ingress=unpacked[2],
-            t_core=unpacked[3],
-            t_risk=unpacked[4],
-            t_egress=unpacked[5],
-            message_type=unpacked[6],
-            flags=unpacked[7],
+            seq_id=seq_no,
+            timestamp_ns=t_host,
+            t_ingress=t_ingress,
+            t_core=t_core,
+            t_risk=t_risk,
+            t_egress=t_egress,
+            message_type=32,  # Default
+            flags=flags,
         )
 
     @classmethod
@@ -226,60 +247,44 @@ class TraceGenerator:
         path: Path,
         provenance: Dict[str, Any] = None
     ):
-        """Write traces to binary file with header."""
+        """Write traces to binary file with standard header."""
+        from ..formats.file_header import FileHeader
+
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(path, 'wb') as f:
-            # Write header
-            f.write(self.MAGIC)
-            f.write(struct.pack('<H', self.VERSION))
-            f.write(struct.pack('<I', len(traces)))
-            f.write(struct.pack('<I', 100))  # clock_mhz
+            # Write standard FileHeader (32 bytes)
+            # Note: provenance is not written to keep compatibility with TraceReader
+            header = FileHeader(
+                version=2,  # v1.2 format
+                endianness=0,  # little-endian
+                record_size=64,  # 64-byte records
+                clock_mhz=100,
+                run_id=self.seed,
+                record_count=len(traces),
+            )
+            f.write(header.encode())
 
-            # Write provenance if provided
-            if provenance:
-                prov_bytes = json.dumps(provenance).encode('utf-8')
-                f.write(struct.pack('<I', len(prov_bytes)))
-                f.write(prov_bytes)
-            else:
-                f.write(struct.pack('<I', 0))
-
-            # Padding to align to 64 bytes
-            current_pos = f.tell()
-            padding = (64 - (current_pos % 64)) % 64
-            f.write(b'\x00' * padding)
-
-            # Write records
+            # Write records immediately after header (no provenance)
             for trace in traces:
                 f.write(trace.to_bytes())
 
     def read_trace_file(self, path: Path) -> List[TraceRecord]:
         """Read traces from binary file."""
+        from ..formats.file_header import FileHeader, HEADER_SIZE
+
         traces = []
 
         with open(path, 'rb') as f:
-            # Read header
-            magic = f.read(4)
-            if magic != self.MAGIC:
-                raise ValueError(f"Invalid trace file: {path}")
-
-            version = struct.unpack('<H', f.read(2))[0]
-            count = struct.unpack('<I', f.read(4))[0]
-            clock_mhz = struct.unpack('<I', f.read(4))[0]
-
-            # Skip provenance
-            prov_len = struct.unpack('<I', f.read(4))[0]
-            if prov_len > 0:
-                f.read(prov_len)
-
-            # Skip to aligned position
-            pos = f.tell()
-            aligned = ((pos + 63) // 64) * 64
-            f.seek(aligned)
+            # Read standard header
+            header_data = f.read(HEADER_SIZE)
+            header = FileHeader.decode(header_data)
 
             # Read records
             record_size = TraceRecord.record_size()
+            count = header.record_count if header.record_count > 0 else 1000000
+
             for _ in range(count):
                 data = f.read(record_size)
                 if len(data) < record_size:
