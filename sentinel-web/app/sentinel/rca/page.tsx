@@ -264,23 +264,21 @@ export default function RcaDashboardPage() {
     <div className="max-w-7xl">
       <header className="mb-6">
         <div className="font-mono text-xs uppercase tracking-widest text-[#4d617a]">
-          workstream 4 · ai agent visibility · trading-desk / compliance view
+          After-hours incident report &middot; trading desk &middot; compliance
         </div>
         <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold text-[#e4edf5]">
           <Brain className="h-6 w-6 text-emerald-400" />
-          Nightly RCA digest
+          Nightly incident digest
         </h1>
-        <p className="mt-2 max-w-3xl text-xs text-[#9ab3c8]">
-          Every drill artifact under{" "}
-          <span className="font-mono text-[#e4edf5]">out/hl/</span> is rolled
-          up into a deterministic feature pack. The page shows{" "}
-          <span className="font-mono">(a)</span> the archived digest,{" "}
-          <span className="font-mono">(b)</span> the exact prompt bytes and
-          sha256 that were sent,{" "}
-          <span className="font-mono">(c)</span> a byte-level diff between the
-          deterministic template and whatever the LLM actually produced, and{" "}
-          <span className="font-mono">(d)</span> the review-only JSON patch
-          the agent would propose. No patch is ever auto-applied.
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-[#9ab3c8]">
+          Every night, a local AI reads today&apos;s drill outputs and writes
+          a plain-English incident report: what went wrong, where in the
+          pipeline, which rule fired, and what the regulator will want to
+          see. Pick a date to see the archived report, the exact prompt the
+          AI was given, a side-by-side of the deterministic template vs. the
+          live AI-written version, and the review-only change the AI would
+          suggest to the ops team. Nothing is ever applied automatically —
+          a human always signs off.
         </p>
       </header>
 

@@ -108,11 +108,8 @@ export default function SentinelLayout({ children }: { children: ReactNode }) {
             <span className="rounded border border-[#1f2a38] bg-[#0f151d] px-2 py-0.5 font-mono text-[10px] text-[#6b8196]">
               v2.0
             </span>
-            <span
-              className="hidden cursor-help font-mono text-xs text-[#6b8196] md:inline"
-              title="Xilinx Alveo U55C — the same FPGA family used by the fastest execution paths on Wall Street. 100 Gbit/s Ethernet interface, 100 MHz processing clock."
-            >
-              U55C · 322 MHz CMAC · 100 MHz datapath
+            <span className="hidden font-mono text-xs text-[#6b8196] md:inline">
+              Pre-trade risk gate &middot; hardware-enforced
             </span>
           </div>
           <div className="flex items-center gap-3">

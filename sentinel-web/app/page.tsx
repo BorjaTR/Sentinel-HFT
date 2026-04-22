@@ -5,7 +5,7 @@ import {
   Briefcase,
   Cpu,
   ShieldCheck,
-  ScrollText,
+  Play,
 } from "lucide-react";
 
 // Two-audience landing. Trading desks (compliance + risk + ops) head
@@ -17,8 +17,8 @@ import {
 
 const PRIMARY = {
   href: "/sentinel",
-  label: "See the four bad days",
-  icon: ScrollText,
+  label: "See a live drill",
+  icon: Play,
 };
 
 const AUDIENCES = [

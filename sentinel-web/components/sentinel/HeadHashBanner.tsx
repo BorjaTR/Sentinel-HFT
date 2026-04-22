@@ -55,7 +55,7 @@ export function HeadHashBanner() {
           chainOk ? "text-emerald-400" : "text-rose-400"
         }`}
       />
-      <span className="text-[#6b8196]">Head hash</span>
+      <span className="text-[#6b8196]">Audit-chain head</span>
       <Link
         href="/sentinel/audit"
         className="group flex items-center gap-1 text-[#d5e0ea] hover:text-emerald-400"

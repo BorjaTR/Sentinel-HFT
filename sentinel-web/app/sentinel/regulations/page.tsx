@@ -226,12 +226,63 @@ export default function RegulationsPage() {
       {/* ================== Cross-jurisdictional rollup ================== */}
       <CrossJurisdictionRollup crosswalk={crosswalk} />
 
-      {/* ================== Today's Evidence Header Card ================== */}
-      <TodayEvidenceCard
-        snapshot={snapshot}
-        alertChain={alertChain}
-        progress={progress}
-      />
+      {/* ================== Static Crosswalk ================== */}
+      <section>
+        <div className="mb-3">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-[#4d617a]">
+            The table
+          </div>
+          <h3 className="mt-1 text-lg font-semibold text-[#e4edf5]">
+            One row per rule, grouped by regulator
+          </h3>
+          <p className="mt-1 text-xs text-[#6b8196]">
+            Click any row to open the exact control that satisfies it —
+            which file, what the audit log records, and what today&apos;s
+            counters say.
+          </p>
+        </div>
+
+        <div className="space-y-6">
+          {grouped.map(([juris, entries]) => (
+            <div key={juris}>
+              <div className="mb-2 flex items-center gap-2 border-b border-[#1a232e] pb-1 font-mono text-[10px] uppercase tracking-widest text-[#6b8196]">
+                <span className="text-base leading-none">
+                  {JURISDICTION_FLAG[juris] ?? "🌐"}
+                </span>
+                {juris} · {entries.length} clause{entries.length === 1 ? "" : "s"}
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 print:grid-cols-1">
+                {entries.map((e) => (
+                  <CrosswalkRow
+                    key={e.key}
+                    entry={e}
+                    onOpenEvidence={() => setDrawerEntry(e)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Legend */}
+      <section className="mt-10 mb-10 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <Legend
+          icon={<CircuitBoard className="h-3 w-3 text-amber-300" />}
+          label="RTL"
+          text="Synthesizable reference implementation under rtl/. Deterministic at line rate."
+        />
+        <Legend
+          icon={<ShieldCheck className="h-3 w-3 text-emerald-300" />}
+          label="Host"
+          text="Python observational module. Never flips a gate decision; counters only."
+        />
+        <Legend
+          icon={<FileText className="h-3 w-3 text-sky-300" />}
+          label="Docs"
+          text="Envelope formatter (resilience log, CAT). Written once per session."
+        />
+      </section>
 
       {/* ================== Live Counters (collapsible) ================== */}
       <section className="mb-10 no-print">
@@ -240,21 +291,29 @@ export default function RegulationsPage() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-widest text-[#4d617a]">
-                  Optional — for compliance teams
+                  Optional &middot; see it live
                 </div>
                 <h3 className="mt-1 text-sm font-semibold text-[#e4edf5]">
-                  Run a drill and watch the counters move in real time
+                  Run a drill and watch today&apos;s evidence + counters move
                 </h3>
                 <p className="mt-1 max-w-2xl text-xs text-[#6b8196]">
-                  Pick one of four drills and watch the system catch a real-looking
-                  problem live. The counters only observe — they never change
-                  the drill&apos;s outcome.
+                  Pick one of four drills. While it runs, the regulator&apos;s
+                  end-of-day packet fills in, and four compliance counters tick
+                  up in parallel — observational only, never changing the
+                  outcome.
                 </p>
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-[#4d617a] transition group-open:rotate-90" />
             </div>
           </summary>
         <div className="border-t border-[#1a232e] p-4">
+        {/* Today's Evidence sits inside the expandable — it only
+            becomes meaningful once a drill has been run. */}
+        <TodayEvidenceCard
+          snapshot={snapshot}
+          alertChain={alertChain}
+          progress={progress}
+        />
         <div className="mb-3 flex items-center justify-end">
           <div className="flex items-center gap-2">
             {activeDrill ? (
@@ -363,64 +422,6 @@ export default function RegulationsPage() {
         </div>
         </div>
         </details>
-      </section>
-
-      {/* ================== Static Crosswalk ================== */}
-      <section>
-        <div className="mb-3">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-[#4d617a]">
-            The table
-          </div>
-          <h3 className="mt-1 text-lg font-semibold text-[#e4edf5]">
-            One row per rule, grouped by regulator
-          </h3>
-          <p className="mt-1 text-xs text-[#6b8196]">
-            Click any row to open the exact control that satisfies it —
-            which file, what the audit log records, and what today&apos;s
-            counters say.
-          </p>
-        </div>
-
-        <div className="space-y-6">
-          {grouped.map(([juris, entries]) => (
-            <div key={juris}>
-              <div className="mb-2 flex items-center gap-2 border-b border-[#1a232e] pb-1 font-mono text-[10px] uppercase tracking-widest text-[#6b8196]">
-                <span className="text-base leading-none">
-                  {JURISDICTION_FLAG[juris] ?? "🌐"}
-                </span>
-                {juris} · {entries.length} clause{entries.length === 1 ? "" : "s"}
-              </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 print:grid-cols-1">
-                {entries.map((e) => (
-                  <CrosswalkRow
-                    key={e.key}
-                    entry={e}
-                    onOpenEvidence={() => setDrawerEntry(e)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Legend */}
-      <section className="mt-10 grid grid-cols-1 gap-3 md:grid-cols-3">
-        <Legend
-          icon={<CircuitBoard className="h-3 w-3 text-amber-300" />}
-          label="RTL"
-          text="Synthesizable reference implementation under rtl/. Deterministic at line rate."
-        />
-        <Legend
-          icon={<ShieldCheck className="h-3 w-3 text-emerald-300" />}
-          label="Host"
-          text="Python observational module. Never flips a gate decision; counters only."
-        />
-        <Legend
-          icon={<FileText className="h-3 w-3 text-sky-300" />}
-          label="Docs"
-          text="Envelope formatter (resilience log, CAT). Written once per session."
-        />
       </section>
 
       {/* Evidence drawer */}
@@ -1514,11 +1515,11 @@ function CrosswalkRow({
         </span>
       </div>
       <h4 className="text-sm font-semibold text-[#e4edf5]">{entry.regulation}</h4>
-      <div className="mt-0.5 font-mono text-[10px] text-[#6b8196]">
+      <div className="mt-1 text-xs font-medium text-[#d5e0ea]">
         {entry.clause}
       </div>
       <p className="mt-2 text-xs leading-relaxed text-[#9ab3c8]">
-        {entry.primitive}
+        What it asks for: {entry.primitive}
       </p>
       <div className="mt-3 space-y-1 border-t border-[#1a232e] pt-2 font-mono text-[10px]">
         <div className="flex items-start gap-2">

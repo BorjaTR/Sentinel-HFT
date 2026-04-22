@@ -189,20 +189,21 @@ export default function TriageDashboardPage() {
     <div className="max-w-7xl">
       <header className="mb-6">
         <div className="font-mono text-[10px] uppercase tracking-widest text-[#4d617a]">
-          workstream 5 · ai agent visibility · trading-desk / compliance view
+          Live alert triage &middot; trading desk &middot; compliance
         </div>
         <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold text-[#e4edf5]">
           <Siren className="h-6 w-6 text-rose-400" />
-          Online triage agent
+          Live alert triage
         </h1>
-        <p className="mt-2 max-w-3xl text-xs text-[#9ab3c8]">
-          Streaming detectors (latency z-score, reject-rate CUSUM, fill-quality
-          SPRT) write to a BLAKE2b-chained sidecar log
-          (<span className="font-mono text-[#e4edf5]">out/triage/alerts.alog</span>).
-          This page reads the chain head, renders per-detector scores against
-          their thresholds, and runs the deterministic scripted evaluation
-          harness on demand to confirm the quality bar (recall = 1.0,
-          precision ≥ 0.70, F1 ≥ 0.80).
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-[#9ab3c8]">
+          Three live detectors watch the desk in real time: one spots a sudden
+          latency spike, one spots a surge in order rejections, one spots
+          fill quality turning bad. Every alert they raise is appended to a
+          tamper-evident log and ranked here by severity so the on-call
+          operator sees the important one first. The page also runs a
+          canned test battery on demand to prove the detectors still clear
+          the agreed quality bar (catch every real problem, with at most a
+          few false alarms per hundred).
         </p>
       </header>
 

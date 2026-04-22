@@ -400,6 +400,15 @@ export default function DrillRunnerPage() {
       </div>
 
       {/* KPI row */}
+      <div className="mb-2 font-mono text-[10px] text-[#6b8196]">
+        <span className="text-[#9ab3c8]">intents</span> orders the desk wanted to send &middot;{" "}
+        <span className="text-[#9ab3c8]">decisions</span> orders the gate ruled on &middot;{" "}
+        <span className="text-emerald-400">passed</span> allowed through &middot;{" "}
+        <span className="text-rose-400">rejected</span> blocked by a rule &middot;{" "}
+        <span className="text-[#9ab3c8]">p50 / p99 / p99.9</span> wire-to-wire
+        latency in nanoseconds (middle / worst-one-in-a-hundred / worst-one-in-a-thousand) &middot;{" "}
+        <span className="text-[#9ab3c8]">kill</span> the physical stop latch
+      </div>
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi label="intents" value={progress?.intents_generated ?? 0} />
         <Kpi label="decisions" value={progress?.decisions_logged ?? 0} />
@@ -542,21 +551,23 @@ function ComplianceStrip({
 
   return (
     <div className="mb-6 rounded-lg border border-[#1a232e] bg-[#0f151d] p-4">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-[#6b8196]">
           <ScrollText className="h-3 w-3 text-emerald-400" />
-          Compliance &middot; observational counters
-          <span className="rounded bg-[#0a0e14] px-1.5 py-0.5 text-[9px] text-[#4d617a]">
-            non-enforcing
-          </span>
+          Compliance counters
         </div>
         <Link
           href="/sentinel/regulations"
           className="font-mono text-[10px] text-[#6b8196] hover:text-emerald-400"
         >
-          clause &rarr; primitive map &rarr;
+          see the full rulebook &rarr;
         </Link>
       </div>
+      <p className="mb-3 text-[11px] leading-relaxed text-[#6b8196]">
+        These counters watch the drill in parallel and tell you what each
+        regulator would see. They never change the outcome — the hardware
+        gate is what actually blocks orders.
+      </p>
 
       {!hasData ? (
         <div className="py-3 text-center font-mono text-[10px] text-[#4d617a]">
