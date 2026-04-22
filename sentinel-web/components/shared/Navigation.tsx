@@ -29,13 +29,12 @@ export function Navigation() {
   const pathname = usePathname();
   const { isSignedIn } = useAuth();
 
-  // The /sentinel/* routes have their own dark trading-floor shell
-  // (see app/sentinel/layout.tsx). Hide the global top bar there so we
-  // don't double up navigation.
-  if (pathname?.startsWith("/sentinel")) {
-    return null;
-  }
-
+  // IMPORTANT: every hook above and below must run on every render —
+  // an early return before useEffect breaks the Rules of Hooks and
+  // crashes the app the first time the user navigates between a
+  // /sentinel/* route (where we hide the global nav) and any other
+  // route (where we show it). Keep all hooks unconditional and
+  // gate the *rendered output* on pathname instead.
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
@@ -43,6 +42,13 @@ export function Navigation() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // The /sentinel/* routes have their own dark trading-floor shell
+  // (see app/sentinel/layout.tsx). Hide the global top bar there so we
+  // don't double up navigation.
+  if (pathname?.startsWith("/sentinel")) {
+    return null;
+  }
 
   return (
     <motion.header
