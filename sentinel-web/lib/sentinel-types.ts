@@ -335,6 +335,57 @@ export interface RunDigestResponse {
   anomaly_count: number;
 }
 
+/** Response of GET /api/ai/rca/{date}/prompt. */
+export interface RcaPromptView {
+  date: string;
+  backend: string;
+  model?: string | null;
+  /** The full Jinja-ish template string (with ``{features_json}`` placeholder). */
+  prompt_template: string;
+  /** The prompt after template interpolation — the exact bytes sent. */
+  prompt: string;
+  /** sha256 of ``prompt``. */
+  prompt_sha256: string;
+  /** True if the regenerated hash matches what was stored with the digest. */
+  prompt_sha256_matches_stored: boolean;
+}
+
+/** One JSON-patch operation on the config tree, with rationale. */
+export interface ConfigPatchOp {
+  op: string;          // "replace" | "add" | "test" | ...
+  path: string;        // e.g. "/triage/latency_zscore/z_threshold"
+  value: unknown;
+  rationale: string;
+  anomaly_kind: string;
+}
+
+/** Response of GET /api/ai/rca/{date}/proposed-patch. Review-only. */
+export interface ProposedPatchView {
+  /** Wire-name preserved (Pydantic alias of ``schema_version``). */
+  schema: string;
+  date: string;
+  /** Always ``true`` — never auto-applied. */
+  review_only: boolean;
+  patch: ConfigPatchOp[];
+  summary: string;
+  patch_hash_sha256: string;
+}
+
+/** Response of GET /api/ai/rca/{date}/compare. */
+export interface RcaCompareView {
+  date: string;
+  backend: string;
+  model?: string | null;
+  /** Whatever the archive stores for that date (may be template or anthropic). */
+  live_markdown: string;
+  /** Template digest regenerated from the stored features. */
+  deterministic_markdown: string;
+  /** Byte-for-byte equal? */
+  identical: boolean;
+  anomaly_count: number;
+  prompt_sha256: string;
+}
+
 /** One sidecar alert row (BLAKE2b chain). */
 export interface AlertSummary {
   seq_no: number;
@@ -357,6 +408,31 @@ export interface AlertChainView {
   bad_index?: number | null;
   bad_reason?: string | null;
   alerts: AlertSummary[];
+}
+
+/** One row in /api/ai/rca/{date}/attribution -- Phase 7 alpha attribution. */
+export interface AttributionRecordView {
+  /** "fill_quality_vs_latency" | "reject_survival" | "kill_drill_survival" */
+  kind: string;
+  drill: string;
+  metric: string;
+  value?: number | null;
+  baseline?: number | null;
+  /** true == green, false == red, null == not applicable. */
+  passes?: boolean | null;
+  headline: string;
+  detail: string;
+  /** Verbatim source citations: "<file>::<field>=<value>". */
+  cited_records: string[];
+}
+
+/** Response of GET /api/ai/rca/{date}/attribution. */
+export interface AttributionView {
+  date: string;
+  backend: string;
+  records: AttributionRecordView[];
+  pass_count: number;
+  fail_count: number;
 }
 
 /** Response of POST /api/ai/triage/eval (scripted-scenario harness). */

@@ -7,7 +7,6 @@ import {
   ShieldCheck,
   ScrollText,
 } from "lucide-react";
-import { HeadHashBanner } from "@/components/sentinel/HeadHashBanner";
 
 // Two-audience landing. Trading desks (compliance + risk + ops) head
 // left; hardware engineers head right. The third surface is the plain-
@@ -67,19 +66,11 @@ const DIFFERENTIATORS = [
 export default function Home() {
   return (
     <div className="min-h-screen bg-[#0a0e14] text-[#d5e0ea]">
-      {/* Persistent banner — head hash + provenance pill. Always-on so
-          you can see at a glance what run you're looking at. */}
-      <div className="border-b border-[#1a232e] bg-[#080b10]">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-2">
-          <div className="flex items-center gap-3">
-            <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-            <span className="font-mono text-xs tracking-wider text-[#9ab3c8]">
-              SENTINEL-HFT · v2.0
-            </span>
-          </div>
-          <HeadHashBanner />
-        </div>
-      </div>
+      {/* Root landing intentionally has no head-hash banner -- that
+          surface belongs inside the /sentinel/* shell (see
+          app/sentinel/layout.tsx) where it's operationally
+          meaningful.  Here it would just collide with the global
+          top nav and confuse a business reader. */}
 
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-[#1a232e]">

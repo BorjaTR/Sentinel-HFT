@@ -11,16 +11,16 @@ import { cn } from "@/lib/utils";
 import { AuthButtons } from "./AuthButtons";
 import { useAuth } from "@/hooks/useAuth";
 
-// Top-bar navigation — Keyrock-demo focused. The legacy SaaS routes
+// Top-bar navigation — Sentinel-HFT v2.0 surface. The legacy SaaS routes
 // (/analyze, /demo, /pricing, /dashboard, /sign-in, /sign-up) still
-// resolve but are not promoted here.
+// resolve but are not promoted here. The /sentinel/* routes own their
+// own dark trading-floor shell, so this top bar is hidden whenever the
+// user is inside a /sentinel/* path (see early-return on pathname below).
 const navLinks = [
   { href: "/", label: "Home" },
-  { href: "/sentinel", label: "Demo" },
-  { href: "/sentinel/regulations", label: "Regulations" },
-  { href: "/sentinel/rca", label: "RCA" },
-  { href: "/sentinel/triage", label: "Triage" },
-  { href: "/sentinel/audit", label: "Audit" },
+  { href: "/sentinel/about", label: "About" },
+  { href: "/sentinel", label: "Trading desks" },
+  { href: "/sentinel/hardware", label: "Hardware" },
 ];
 
 export function Navigation() {

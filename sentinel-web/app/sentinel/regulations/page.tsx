@@ -11,15 +11,22 @@ import {
   CircuitBoard,
   AlertTriangle,
   Activity,
+  X,
+  Printer,
+  Eye,
+  Hash,
+  ChevronRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   getComplianceCrosswalk,
   getComplianceSnapshotShape,
+  getTriageAlerts,
   streamDrill,
 } from "@/lib/sentinel-api";
 import type {
+  AlertChainView,
   ComplianceCrosswalkResponse,
   ComplianceEntry,
   ComplianceSnapshot,
@@ -66,21 +73,34 @@ function fmtRatio(x: number | undefined | null): string {
   return x.toFixed(2);
 }
 
+function shortHash(h: string | null | undefined): string {
+  if (!h) return "–";
+  const trimmed = h.replace(/^0x/, "");
+  return trimmed.length <= 16 ? trimmed : `${trimmed.slice(0, 8)}…${trimmed.slice(-8)}`;
+}
+
 export default function RegulationsPage() {
   const [crosswalk, setCrosswalk] = useState<ComplianceCrosswalkResponse | null>(null);
   const [snapshot, setSnapshot] = useState<ComplianceSnapshot | null>(null);
+  const [alertChain, setAlertChain] = useState<AlertChainView | null>(null);
   const [activeDrill, setActiveDrill] = useState<DrillKind | null>(null);
   const [progress, setProgress] = useState<WsProgress | null>(null);
   const [marAlertCount, setMarAlertCount] = useState<number>(0);
   const [lastTick, setLastTick] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [drawerEntry, setDrawerEntry] = useState<ComplianceEntry | null>(null);
   const streamRef = useRef<ReturnType<typeof streamDrill> | null>(null);
 
   useEffect(() => {
-    Promise.all([getComplianceCrosswalk(), getComplianceSnapshotShape()])
-      .then(([cw, shape]) => {
+    Promise.all([
+      getComplianceCrosswalk(),
+      getComplianceSnapshotShape(),
+      getTriageAlerts({ limit: 1 }),
+    ])
+      .then(([cw, shape, chain]) => {
         setCrosswalk(cw);
         setSnapshot(shape);
+        setAlertChain(chain);
       })
       .catch((e) => setErr(String(e)));
     return () => {
@@ -125,6 +145,9 @@ export default function RegulationsPage() {
           }
         } else if (ev.type === "result") {
           setActiveDrill(null);
+          // Refresh the audit chain tail so the Today's evidence card
+          // reflects the just-finished drill's head hash.
+          getTriageAlerts({ limit: 1 }).then(setAlertChain).catch(() => {});
         } else if (ev.type === "error") {
           setErr(ev.error);
           setActiveDrill(null);
@@ -155,31 +178,38 @@ export default function RegulationsPage() {
   }, [crosswalk]);
 
   return (
-    <div className="max-w-6xl pt-24 pb-10">
+    <div className="max-w-6xl pt-24 pb-10 print:pt-6 print:pb-6">
       {/* Header */}
-      <header className="mb-8">
-        <Link
-          href="/sentinel"
-          className="mb-3 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-[#4d617a] transition hover:text-emerald-400"
-        >
-          <ArrowLeft className="h-3 w-3" /> sentinel / overview
-        </Link>
-        <h1 className="font-mono text-xs uppercase tracking-widest text-[#4d617a]">
-          Workstream 3 · Regulation crosswalk
-        </h1>
-        <h2 className="mt-2 text-3xl font-semibold text-[#e4edf5]">
-          What each regulation does, and what&apos;s ticking up right now
-        </h2>
-        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[#9ab3c8]">
-          Static map of 9 regulation clauses to the primitives Sentinel-HFT
-          ships (top). Live observational counters from the host compliance
-          stack (bottom) &mdash; pick a drill and watch the counters move.
-          The stack never modifies a drill&apos;s outcome; it only observes.
-        </p>
+      <header className="mb-8 print:mb-4">
+        <div className="no-print">
+          <Link
+            href="/sentinel"
+            className="mb-3 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-[#4d617a] transition hover:text-emerald-400"
+          >
+            <ArrowLeft className="h-3 w-3" /> sentinel / overview
+          </Link>
+        </div>
+        <div className="flex items-start justify-between gap-6">
+          <div className="flex-1">
+            <h1 className="font-mono text-xs uppercase tracking-widest text-[#4d617a]">
+              Workstream 3 · Regulation crosswalk · Trading-desk / compliance view
+            </h1>
+            <h2 className="mt-2 text-3xl font-semibold text-[#e4edf5]">
+              What each regulation does, and what&apos;s ticking up right now
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[#9ab3c8]">
+              Static map of 9 regulation clauses to the primitives Sentinel-HFT
+              ships (top). Live observational counters from the host compliance
+              stack (bottom) &mdash; pick a drill and watch the counters move.
+              The stack never modifies a drill&apos;s outcome; it only observes.
+            </p>
+          </div>
+          <RegulatorExportButton />
+        </div>
       </header>
 
       {err && (
-        <div className="mb-6 rounded-md border border-rose-900/60 bg-rose-950/40 px-4 py-3 font-mono text-xs text-rose-200">
+        <div className="mb-6 rounded-md border border-rose-900/60 bg-rose-950/40 px-4 py-3 font-mono text-xs text-rose-200 no-print">
           {err}
           <div className="mt-1 text-rose-400/80">
             start backend with:{" "}
@@ -190,8 +220,18 @@ export default function RegulationsPage() {
         </div>
       )}
 
+      {/* ================== Cross-jurisdictional rollup ================== */}
+      <CrossJurisdictionRollup crosswalk={crosswalk} />
+
+      {/* ================== Today's Evidence Header Card ================== */}
+      <TodayEvidenceCard
+        snapshot={snapshot}
+        alertChain={alertChain}
+        progress={progress}
+      />
+
       {/* ================== Live Counters ================== */}
-      <section className="mb-10">
+      <section className="mb-10 no-print">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <div className="font-mono text-[10px] uppercase tracking-widest text-[#4d617a]">
@@ -322,7 +362,8 @@ export default function RegulationsPage() {
             <span className="font-mono text-[#9ab3c8]">
               sentinel_hft/compliance/crosswalk.py
             </span>
-            .
+            . Click any row for the exact code path and artefact that
+            satisfies that clause.
           </p>
         </div>
 
@@ -335,9 +376,13 @@ export default function RegulationsPage() {
                 </span>
                 {juris} · {entries.length} clause{entries.length === 1 ? "" : "s"}
               </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 print:grid-cols-1">
                 {entries.map((e) => (
-                  <CrosswalkRow key={e.key} entry={e} />
+                  <CrosswalkRow
+                    key={e.key}
+                    entry={e}
+                    onOpenEvidence={() => setDrawerEntry(e)}
+                  />
                 ))}
               </div>
             </div>
@@ -363,12 +408,740 @@ export default function RegulationsPage() {
           text="Envelope formatter (resilience log, CAT). Written once per session."
         />
       </section>
+
+      {/* Evidence drawer */}
+      {drawerEntry && (
+        <EvidenceDrawer
+          entry={drawerEntry}
+          snapshot={snapshot}
+          alertChain={alertChain}
+          onClose={() => setDrawerEntry(null)}
+        />
+      )}
+
+      {/* Print-only footer so the exported PDF carries the run window
+          and the audit anchor inline, not just as a header card. */}
+      <section className="mt-8 hidden border-t border-[#1a232e] pt-4 print:block">
+        <div className="font-mono text-[10px] text-[#6b8196]">
+          Exported {new Date().toISOString()} · head-hash{" "}
+          {shortHash(alertChain?.head_hash_lo)} · chain{" "}
+          {alertChain?.chain_ok === false ? "BROKEN" : "ok"} ·{" "}
+          {alertChain?.n_records ?? 0} records · Sentinel-HFT regulator
+          bundle.
+        </div>
+      </section>
+
+      {/* Print styling: hide noise, tighten margins, keep rows intact. */}
+      <style jsx global>{`
+        @media print {
+          html, body {
+            background: white !important;
+            color: black !important;
+          }
+          .no-print { display: none !important; }
+          .print\\:block { display: block !important; }
+          .print\\:grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
+          .print\\:pt-6 { padding-top: 1.5rem !important; }
+          .print\\:pb-6 { padding-bottom: 1.5rem !important; }
+          .print\\:mb-4 { margin-bottom: 1rem !important; }
+          [class*="border-"] { border-color: #111 !important; }
+          [class*="bg-[#0f151d]"], [class*="bg-[#0a0e14]"] {
+            background: white !important;
+          }
+          [class*="text-[#e4edf5]"] { color: black !important; }
+          [class*="text-[#9ab3c8]"] { color: #222 !important; }
+          [class*="text-[#6b8196]"] { color: #444 !important; }
+          [class*="text-[#4d617a]"] { color: #666 !important; }
+          a { text-decoration: none !important; color: black !important; }
+        }
+      `}</style>
     </div>
   );
 }
 
 // =====================================================================
-// Live-counter tiles
+// Cross-jurisdictional rollup — one badge per regulator, clause coverage %
+// =====================================================================
+
+function CrossJurisdictionRollup({
+  crosswalk,
+}: {
+  crosswalk: ComplianceCrosswalkResponse | null;
+}) {
+  // Collapse the crosswalk into a per-jurisdiction summary:
+  //   - total clauses mapped
+  //   - implemented + reused count (both are "shipped" states)
+  //   - partial / stub count (the gap)
+  //   - live counter coverage
+  //
+  // Coverage % is reported as ``(implemented + reused) / total`` because
+  // those two statuses both mean "the primitive is in the build today".
+  // ``partial`` and ``stub`` count as NOT-yet-covered.
+  type Row = {
+    jurisdiction: string;
+    total: number;
+    covered: number;
+    partial: number;
+    stub: number;
+    live: number;
+  };
+
+  // Canonical display order. The V2 plan mentions UK; it isn't in the
+  // current crosswalk but we keep the slot so the badge grid visibly
+  // communicates "not yet mapped" instead of silently dropping it.
+  const ORDER: Array<{ key: string; label: string }> = [
+    { key: "EU", label: "EU · MiFID II / MAR" },
+    { key: "US", label: "US · SEC / CFTC / FINRA" },
+    { key: "UK", label: "UK · FCA" },
+    { key: "CH", label: "CH · FINMA" },
+    { key: "SG", label: "SG · MAS" },
+    { key: "Global", label: "Global · DORA-shaped" },
+  ];
+
+  const rows: Row[] = ORDER.map(({ key }) => {
+    const entries =
+      crosswalk?.entries.filter((e) => e.jurisdiction === key) ?? [];
+    const covered = entries.filter(
+      (e) => e.status === "implemented" || e.status === "reused",
+    ).length;
+    const partial = entries.filter((e) => e.status === "partial").length;
+    const stub = entries.filter((e) => e.status === "stub").length;
+    const live = entries.filter((e) => e.live_counter).length;
+    return {
+      jurisdiction: key,
+      total: entries.length,
+      covered,
+      partial,
+      stub,
+      live,
+    };
+  });
+
+  const totalEntries = crosswalk?.entries.length ?? 0;
+  const totalCovered =
+    crosswalk?.entries.filter(
+      (e) => e.status === "implemented" || e.status === "reused",
+    ).length ?? 0;
+  const totalLive = crosswalk?.live_counter_keys.length ?? 0;
+  const globalPct =
+    totalEntries > 0 ? Math.round((100 * totalCovered) / totalEntries) : 0;
+
+  return (
+    <section className="mb-8 no-print">
+      <div className="mb-3 flex items-end justify-between">
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-[#4d617a]">
+            Cross-jurisdictional rollup
+          </div>
+          <h3 className="mt-1 text-lg font-semibold text-[#e4edf5]">
+            Clause coverage by regulator
+          </h3>
+          <p className="mt-1 max-w-3xl text-xs text-[#6b8196]">
+            One badge per regulator. Coverage % = (implemented + reused) /
+            total clauses mapped. ``partial`` and ``stub`` count against
+            coverage until they ship. Missing regulators show the slot
+            with a zero count so the gap is visible, not hidden.
+          </p>
+        </div>
+        <div className="text-right font-mono text-[10px] text-[#6b8196]">
+          <div>
+            global:{" "}
+            <span className="text-[#e4edf5]">
+              {totalCovered}/{totalEntries}
+            </span>{" "}
+            · {globalPct}%
+          </div>
+          <div>
+            live counters:{" "}
+            <span className="text-emerald-300">{totalLive}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        {rows.map((row) => (
+          <JurisdictionBadge key={row.jurisdiction} row={row} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function JurisdictionBadge({
+  row,
+}: {
+  row: {
+    jurisdiction: string;
+    total: number;
+    covered: number;
+    partial: number;
+    stub: number;
+    live: number;
+  };
+}) {
+  const mapped = row.total > 0;
+  const pct = mapped ? Math.round((100 * row.covered) / row.total) : 0;
+  const hasGap = row.partial + row.stub > 0;
+  const fullyCovered = mapped && row.covered === row.total && !hasGap;
+
+  const border = !mapped
+    ? "border-[#1f2a38]"
+    : fullyCovered
+      ? "border-emerald-500/40"
+      : hasGap
+        ? "border-amber-500/40"
+        : "border-sky-500/30";
+  const bg = !mapped
+    ? "bg-[#0a0e14]"
+    : fullyCovered
+      ? "bg-emerald-500/5"
+      : hasGap
+        ? "bg-amber-500/5"
+        : "bg-sky-500/5";
+  const pctColor = !mapped
+    ? "text-[#4d617a]"
+    : fullyCovered
+      ? "text-emerald-300"
+      : hasGap
+        ? "text-amber-300"
+        : "text-sky-300";
+
+  return (
+    <div className={`rounded-md border px-3 py-3 ${border} ${bg}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-lg leading-none">
+            {JURISDICTION_FLAG[row.jurisdiction] ?? "🌐"}
+          </span>
+          <span className="font-mono text-xs font-semibold text-[#e4edf5]">
+            {row.jurisdiction}
+          </span>
+        </div>
+        <span className={`font-mono text-lg font-semibold tabular-nums ${pctColor}`}>
+          {mapped ? `${pct}%` : "—"}
+        </span>
+      </div>
+
+      {/* progress bar */}
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-[#0a0e14]">
+        <div
+          className={`h-full transition-all ${
+            fullyCovered
+              ? "bg-emerald-500"
+              : hasGap
+                ? "bg-amber-500"
+                : "bg-sky-500"
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
+      <div className="mt-2 font-mono text-[9px] uppercase tracking-wider text-[#6b8196]">
+        {mapped ? (
+          <>
+            <span className="text-[#e4edf5]">{row.covered}</span>
+            {" / "}
+            <span>{row.total}</span> clauses
+          </>
+        ) : (
+          <span className="text-[#4d617a]">not yet mapped</span>
+        )}
+      </div>
+      <div className="mt-0.5 flex flex-wrap gap-1.5 font-mono text-[9px]">
+        {row.live > 0 && (
+          <span className="rounded border border-emerald-500/30 bg-emerald-500/5 px-1.5 py-0 text-emerald-300">
+            {row.live} live
+          </span>
+        )}
+        {row.partial > 0 && (
+          <span className="rounded border border-amber-500/30 bg-amber-500/5 px-1.5 py-0 text-amber-300">
+            {row.partial} partial
+          </span>
+        )}
+        {row.stub > 0 && (
+          <span className="rounded border border-rose-500/30 bg-rose-500/5 px-1.5 py-0 text-rose-300">
+            {row.stub} stub
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// Today's Evidence — the "what a regulator sees now" header card
+// =====================================================================
+
+function TodayEvidenceCard({
+  snapshot,
+  alertChain,
+  progress,
+}: {
+  snapshot: ComplianceSnapshot | null;
+  alertChain: AlertChainView | null;
+  progress: WsProgress | null;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const mifid = snapshot?.mifid_otr;
+  const selfTrade = snapshot?.cftc_self_trade;
+  const fat = snapshot?.finra_fat_finger;
+  const cat = snapshot?.sec_cat;
+  const mar = snapshot?.mar_abuse;
+
+  const orders = Number(mifid?.total_orders ?? 0);
+  const selfRejects = Number(selfTrade?.rejected ?? 0);
+  const fatRejects = Number(fat?.rejected ?? 0);
+  const catEmitted = Number(cat?.total_records ?? 0);
+  const marAlerts = Number(mar?.alerts ?? 0);
+
+  const hasSignal =
+    orders > 0 ||
+    selfRejects > 0 ||
+    fatRejects > 0 ||
+    catEmitted > 0 ||
+    marAlerts > 0;
+  const chainOk = alertChain?.chain_ok ?? true;
+
+  return (
+    <Card className="mb-8 border-emerald-500/20 bg-gradient-to-br from-[#0f151d] to-[#0a1014] print:border-[#111] print:bg-white">
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="font-mono text-[10px] uppercase tracking-widest text-emerald-300/80">
+              Today&apos;s evidence · {today}
+            </CardTitle>
+            <div className="mt-1 text-sm text-[#9ab3c8]">
+              Live compliance counters + the latest audit-chain head hash.
+              This is what a regulator would see if they pulled the bundle
+              right now.
+            </div>
+          </div>
+          <div className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-wider">
+            {progress ? (
+              <span className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-emerald-300">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                </span>
+                drill running
+              </span>
+            ) : hasSignal ? (
+              <span className="inline-flex items-center gap-1 rounded border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-sky-300">
+                drill complete
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded border border-[#1f2a38] bg-[#0a0e14] px-2 py-1 text-[#6b8196]">
+                no events yet today
+              </span>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          <EvidenceStat
+            label="MiFID OTR · orders"
+            value={orders}
+            sub={`ratio ${fmtRatio(Number(mifid?.global_ratio ?? 0))}`}
+            warn={Boolean(mifid?.would_trip)}
+          />
+          <EvidenceStat
+            label="CFTC self-trade · rejects"
+            value={selfRejects}
+            sub={`of ${fmtNum(Number(selfTrade?.checked ?? 0))} checked`}
+            warn={selfRejects > 0}
+          />
+          <EvidenceStat
+            label="FINRA fat-finger · rejects"
+            value={fatRejects}
+            sub={`worst ${fmtNum(Number(fat?.worst_deviation_bps ?? 0))} bps`}
+            warn={fatRejects > 0}
+          />
+          <EvidenceStat
+            label="SEC CAT · records"
+            value={catEmitted}
+            sub="Phase 2e feed"
+          />
+          <EvidenceStat
+            label="MAR spoofing · alerts"
+            value={marAlerts}
+            sub={marAlerts > 0 ? "action required" : "clean"}
+            warn={marAlerts > 0}
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#1a232e] bg-[#0a0e14] px-3 py-2 font-mono text-[10px] text-[#9ab3c8] print:bg-white">
+          <div className="flex items-center gap-2">
+            <Hash className="h-3 w-3 text-emerald-400" />
+            <span className="text-[#6b8196]">audit head hash ·</span>
+            <span className="text-emerald-300">
+              {shortHash(alertChain?.head_hash_lo)}
+            </span>
+            {alertChain?.head_hash_lo && (
+              <span className="text-[#4d617a]">({alertChain.head_hash_lo.length * 4}-bit lo half)</span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[#6b8196]">
+              records{" "}
+              <span className="text-[#e4edf5]">
+                {fmtNum(alertChain?.n_records ?? 0)}
+              </span>
+            </span>
+            <span className="text-[#6b8196]">·</span>
+            <span
+              className={
+                chainOk
+                  ? "text-emerald-400"
+                  : "text-rose-400"
+              }
+            >
+              chain {chainOk ? "ok" : "BROKEN"}
+            </span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EvidenceStat({
+  label,
+  value,
+  sub,
+  warn,
+}: {
+  label: string;
+  value: number;
+  sub?: string;
+  warn?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-md border px-3 py-2 ${
+        warn
+          ? "border-rose-500/40 bg-rose-500/5"
+          : "border-[#1a232e] bg-[#0a0e14] print:bg-white"
+      }`}
+    >
+      <div className="font-mono text-[9px] uppercase tracking-wider text-[#6b8196]">
+        {label}
+      </div>
+      <div
+        className={`mt-1 font-mono text-xl font-semibold tabular-nums ${
+          warn ? "text-rose-300" : "text-[#e4edf5]"
+        }`}
+      >
+        {fmtNum(value)}
+      </div>
+      {sub && (
+        <div className="mt-0.5 font-mono text-[9px] text-[#4d617a]">{sub}</div>
+      )}
+    </div>
+  );
+}
+
+// =====================================================================
+// Regulator-export print button
+// =====================================================================
+
+function RegulatorExportButton() {
+  return (
+    <Button
+      onClick={() => {
+        if (typeof window !== "undefined") {
+          window.print();
+        }
+      }}
+      size="sm"
+      variant="outline"
+      className="no-print border-emerald-500/40 bg-emerald-500/5 font-mono text-xs text-emerald-300 hover:bg-emerald-500/10"
+      title="Print the crosswalk + today's evidence + audit head hash as a single PDF. Use your browser's 'Save as PDF' destination."
+    >
+      <Printer className="mr-1.5 h-3 w-3" />
+      Regulator export
+    </Button>
+  );
+}
+
+// =====================================================================
+// Evidence drawer — click a crosswalk row to see the exact code path
+// =====================================================================
+
+type ArtifactSlice = { path: string; kind: "RTL" | "Host" | "Docs" | "Config" };
+
+function splitArtifact(entry: ComplianceEntry): ArtifactSlice[] {
+  // The artifact field may be a single path or a ``+`` joined list.
+  // Classify each chunk by extension so the drawer can render a
+  // file-icon and a sensible badge.
+  const raw = entry.artifact
+    .split("+")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return raw.map((path) => {
+    if (path.endsWith(".sv") || path.endsWith(".v")) {
+      return { path, kind: "RTL" } as const;
+    }
+    if (path.endsWith(".py")) {
+      return { path, kind: "Host" } as const;
+    }
+    if (path.endsWith(".md") || path.endsWith(".json") || path.endsWith(".yaml")) {
+      return { path, kind: "Docs" } as const;
+    }
+    return { path, kind: "Config" } as const;
+  });
+}
+
+function EvidenceDrawer({
+  entry,
+  snapshot,
+  alertChain,
+  onClose,
+}: {
+  entry: ComplianceEntry;
+  snapshot: ComplianceSnapshot | null;
+  alertChain: AlertChainView | null;
+  onClose: () => void;
+}) {
+  const artefacts = splitArtifact(entry);
+  const signals = entry.audit_signal
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  // Closable via Escape.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const liveValue = liveValueForEntry(entry.key, snapshot);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/60 backdrop-blur-sm no-print"
+      onClick={onClose}
+    >
+      <aside
+        className="h-full w-full max-w-xl overflow-y-auto border-l border-[#1a232e] bg-[#0f151d] p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-[#4d617a]">
+              Evidence · {entry.jurisdiction}
+            </div>
+            <h3 className="mt-1 text-lg font-semibold text-[#e4edf5]">
+              {entry.regulation}
+            </h3>
+            <div className="mt-0.5 font-mono text-[11px] text-[#6b8196]">
+              {entry.clause}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded border border-[#1f2a38] p-1.5 text-[#6b8196] transition hover:border-[#2a3a4c] hover:text-[#e4edf5]"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <p className="mb-5 text-sm leading-relaxed text-[#9ab3c8]">
+          {entry.primitive}
+        </p>
+
+        <DrawerSection title="What satisfies this clause">
+          <div className="space-y-2">
+            {artefacts.map((a) => (
+              <div
+                key={a.path}
+                className="flex items-start gap-2 rounded-md border border-[#1a232e] bg-[#0a0e14] px-3 py-2"
+              >
+                <span
+                  className={`mt-0.5 inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider ${
+                    LAYER_TONE[a.kind] ?? LAYER_TONE.Host
+                  }`}
+                >
+                  {a.kind}
+                </span>
+                <code className="break-all font-mono text-[11px] text-[#e4edf5]">
+                  {a.path}
+                </code>
+              </div>
+            ))}
+            {artefacts.length === 0 && (
+              <div className="rounded-md border border-[#1a232e] bg-[#0a0e14] px-3 py-2 font-mono text-[11px] text-[#6b8196]">
+                (no concrete artefact recorded)
+              </div>
+            )}
+          </div>
+        </DrawerSection>
+
+        <DrawerSection title="What the audit log records">
+          <ul className="space-y-1">
+            {signals.map((s) => (
+              <li
+                key={s}
+                className="flex items-start gap-2 font-mono text-[11px] text-[#9ab3c8]"
+              >
+                <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-[#4d617a]" />
+                <code className="text-sky-300">{s}</code>
+              </li>
+            ))}
+          </ul>
+        </DrawerSection>
+
+        {entry.live_counter && (
+          <DrawerSection title="Today's value">
+            <div className="rounded-md border border-[#1a232e] bg-[#0a0e14] p-3">
+              {liveValue ? (
+                <div className="space-y-1 font-mono text-[11px] text-[#9ab3c8]">
+                  {Object.entries(liveValue).map(([k, v]) => (
+                    <div key={k} className="flex items-center gap-3">
+                      <span className="w-40 shrink-0 text-[#4d617a]">
+                        {k}
+                      </span>
+                      <span className="text-[#e4edf5]">
+                        {formatVal(v)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="font-mono text-[11px] text-[#6b8196]">
+                  no live counters published yet — run a drill to populate.
+                </div>
+              )}
+            </div>
+          </DrawerSection>
+        )}
+
+        <DrawerSection title="Audit chain anchor">
+          <div className="rounded-md border border-[#1a232e] bg-[#0a0e14] p-3 font-mono text-[11px]">
+            <div className="flex items-center gap-2">
+              <span className="text-[#4d617a]">head hash</span>
+              <span className="text-emerald-300">
+                {shortHash(alertChain?.head_hash_lo)}
+              </span>
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="text-[#4d617a]">records</span>
+              <span className="text-[#e4edf5]">
+                {fmtNum(alertChain?.n_records ?? 0)}
+              </span>
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="text-[#4d617a]">chain</span>
+              <span
+                className={
+                  (alertChain?.chain_ok ?? true)
+                    ? "text-emerald-400"
+                    : "text-rose-400"
+                }
+              >
+                {(alertChain?.chain_ok ?? true) ? "ok" : "BROKEN"}
+              </span>
+            </div>
+          </div>
+        </DrawerSection>
+
+        <DrawerSection title="Traceability">
+          <div className="space-y-1 font-mono text-[11px] text-[#9ab3c8]">
+            <Row label="crosswalk key" value={entry.key} mono />
+            <Row label="layer" value={entry.layer} />
+            <Row label="live counter" value={entry.live_counter ? "yes" : "no"} />
+            <Row label="status">
+              <span className={STATUS_TONE[entry.status] ?? "text-[#9ab3c8]"}>
+                {entry.status}
+              </span>
+            </Row>
+            <Row
+              label="source-of-truth"
+              value="sentinel_hft/compliance/crosswalk.py"
+              mono
+            />
+          </div>
+        </DrawerSection>
+      </aside>
+    </div>
+  );
+}
+
+function DrawerSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-5">
+      <div className="mb-2 flex items-center gap-2 font-mono text-[9px] uppercase tracking-widest text-[#4d617a]">
+        <Eye className="h-2.5 w-2.5" /> {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Row({
+  label,
+  value,
+  mono,
+  children,
+}: {
+  label: string;
+  value?: string;
+  mono?: boolean;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="w-36 shrink-0 text-[#4d617a]">{label}</span>
+      <span className={mono ? "break-all text-[#e4edf5]" : "text-[#e4edf5]"}>
+        {children ?? value ?? "–"}
+      </span>
+    </div>
+  );
+}
+
+function liveValueForEntry(
+  key: string,
+  snap: ComplianceSnapshot | null,
+): Record<string, unknown> | null {
+  if (!snap) return null;
+  switch (key) {
+    case "mifid_otr":
+      return snap.mifid_otr ?? null;
+    case "cftc_self_trade":
+      return snap.cftc_self_trade ?? null;
+    case "finra_fat_finger":
+      return snap.finra_fat_finger ?? null;
+    case "sec_cat":
+      return snap.sec_cat ?? null;
+    case "mar_abuse":
+      return snap.mar_abuse ?? null;
+    default:
+      return null;
+  }
+}
+
+function formatVal(v: unknown): string {
+  if (v == null) return "–";
+  if (typeof v === "number") return v.toLocaleString();
+  if (typeof v === "boolean") return v ? "true" : "false";
+  if (typeof v === "string") return v;
+  if (Array.isArray(v)) return `[${v.length} items]`;
+  return JSON.stringify(v);
+}
+
+// =====================================================================
+// Live-counter tiles (unchanged from prior cut, kept in-file for locality)
 // =====================================================================
 
 function TileShell({
@@ -689,15 +1462,25 @@ function MarAlertsStrip({
 }
 
 // =====================================================================
-// Crosswalk row
+// Crosswalk row — now clickable to open the evidence drawer
 // =====================================================================
 
-function CrosswalkRow({ entry }: { entry: ComplianceEntry }) {
+function CrosswalkRow({
+  entry,
+  onOpenEvidence,
+}: {
+  entry: ComplianceEntry;
+  onOpenEvidence: () => void;
+}) {
   const layerCls =
     LAYER_TONE[entry.layer] ?? "border-[#1f2a38] bg-[#0a0e14] text-[#9ab3c8]";
   const statusCls = STATUS_TONE[entry.status] ?? "text-[#9ab3c8]";
   return (
-    <div className="relative rounded-lg border border-[#1a232e] bg-[#0f151d] p-4">
+    <button
+      type="button"
+      onClick={onOpenEvidence}
+      className="group relative rounded-lg border border-[#1a232e] bg-[#0f151d] p-4 text-left transition hover:border-emerald-500/40 hover:bg-[#11181f] focus:outline-none focus:ring-1 focus:ring-emerald-500/60 print:cursor-default print:hover:border-[#1a232e] print:hover:bg-[#0f151d]"
+    >
       <div className="mb-2 flex items-center gap-2">
         <span
           className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider ${layerCls}`}
@@ -712,6 +1495,9 @@ function CrosswalkRow({ entry }: { entry: ComplianceEntry }) {
             <Activity className="h-2.5 w-2.5" /> live
           </span>
         )}
+        <span className="text-[#4d617a] opacity-0 transition group-hover:opacity-100 no-print">
+          <ChevronRight className="h-3 w-3" />
+        </span>
       </div>
       <h4 className="text-sm font-semibold text-[#e4edf5]">{entry.regulation}</h4>
       <div className="mt-0.5 font-mono text-[10px] text-[#6b8196]">
@@ -734,7 +1520,7 @@ function CrosswalkRow({ entry }: { entry: ComplianceEntry }) {
           <span className={statusCls}>{entry.status}</span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 

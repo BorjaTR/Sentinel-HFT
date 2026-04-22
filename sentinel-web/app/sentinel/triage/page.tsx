@@ -14,6 +14,8 @@ import {
   CheckCircle2,
   XCircle,
   Play,
+  LineChart,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +30,57 @@ import type {
   AlertSummary,
   TriageEvalResponse,
 } from "@/lib/sentinel-types";
+
+// ---------------------------------------------------------------------------
+// Detector contract
+//
+// These thresholds mirror ``sentinel_hft/ai/triage.py`` defaults. The UI is
+// observational — if the server config changes at runtime we won't know here,
+// but the numbers below are the values used by the deterministic eval harness
+// (``run_evaluation()``) so the rendered plots match the shipped quality bar.
+// ---------------------------------------------------------------------------
+
+interface DetectorSpec {
+  key: string;
+  label: string;
+  family: "latency" | "reject_rate" | "fill_quality";
+  threshold: number;
+  threshold_label: string;
+  description: string;
+}
+
+const DETECTORS: DetectorSpec[] = [
+  {
+    key: "latency_zscore",
+    label: "latency z-score",
+    family: "latency",
+    threshold: 4.0,
+    threshold_label: "z_threshold",
+    description:
+      "Rolling z-score on stage latency p99. Fires when the latest window deviates by ≥ z_threshold standard deviations from the rolling baseline.",
+  },
+  {
+    key: "reject_rate_cusum",
+    label: "reject-rate CUSUM",
+    family: "reject_rate",
+    threshold: 5.0,
+    threshold_label: "alert_threshold",
+    description:
+      "One-sided CUSUM on risk-reject rate. Fires when the cumulative deviation above the reference level crosses alert_threshold.",
+  },
+  {
+    key: "fill_quality_sprt",
+    label: "fill-quality SPRT",
+    family: "fill_quality",
+    threshold: 4.0,
+    threshold_label: "accept_upper",
+    description:
+      "Sequential probability ratio test on fill-quality clusters. Fires when the log-likelihood ratio exceeds accept_upper in favour of the anomaly hypothesis.",
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Helpers
 
 function severityTone(sev: string): string {
   const s = (sev || "").toLowerCase();
@@ -48,7 +101,6 @@ function severityBadge(sev: string): string {
 }
 
 function fmtTs(ns: number): string {
-  // Records are ns since epoch; convert to ms.
   if (!ns || !Number.isFinite(ns)) return "—";
   const ms = Math.floor(ns / 1_000_000);
   try {
@@ -63,9 +115,12 @@ function pct(x: number): string {
   return `${(x * 100).toFixed(1)}%`;
 }
 
+// ---------------------------------------------------------------------------
+// Page component
+
 export default function TriageDashboardPage() {
   const [view, setView] = useState<AlertChainView | null>(null);
-  const [limit, setLimit] = useState<number>(100);
+  const [limit, setLimit] = useState<number>(200);
   const [loading, setLoading] = useState(false);
 
   const [evalReport, setEvalReport] = useState<TriageEvalResponse | null>(null);
@@ -114,23 +169,40 @@ export default function TriageDashboardPage() {
     return [...view.alerts].reverse();
   }, [view]);
 
+  // Group alerts by detector key for the per-detector plots.
+  //
+  // We keep chain-order (seq_no ascending) so the sparkline reads left→right
+  // as a time series. This matches how the underlying .alog is appended.
+  const alertsByDetector: Record<string, AlertSummary[]> = useMemo(() => {
+    const out: Record<string, AlertSummary[]> = {};
+    if (!view) return out;
+    const chronological = [...view.alerts].sort((a, b) => a.seq_no - b.seq_no);
+    for (const a of chronological) {
+      const key = (a.detector || "").toLowerCase();
+      if (!out[key]) out[key] = [];
+      out[key].push(a);
+    }
+    return out;
+  }, [view]);
+
   return (
     <div className="max-w-7xl">
       <header className="mb-6">
-        <div className="font-mono text-xs uppercase tracking-widest text-[#4d617a]">
-          tool · ai
+        <div className="font-mono text-[10px] uppercase tracking-widest text-[#4d617a]">
+          workstream 5 · ai agent visibility · trading-desk / compliance view
         </div>
         <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold text-[#e4edf5]">
           <Siren className="h-6 w-6 text-rose-400" />
           Online triage agent
         </h1>
         <p className="mt-2 max-w-3xl text-xs text-[#9ab3c8]">
-          Workstream 5 — streaming detectors (latency z-score, reject-rate
-          CUSUM, SPRT) write to a BLAKE2b-chained sidecar log
+          Streaming detectors (latency z-score, reject-rate CUSUM, fill-quality
+          SPRT) write to a BLAKE2b-chained sidecar log
           (<span className="font-mono text-[#e4edf5]">out/triage/alerts.alog</span>).
-          This page reads the chain head and recent records, and runs the
-          deterministic scripted evaluation harness on demand to confirm the
-          quality bar (recall = 1.0, precision ≥ 0.70, F1 ≥ 0.80).
+          This page reads the chain head, renders per-detector scores against
+          their thresholds, and runs the deterministic scripted evaluation
+          harness on demand to confirm the quality bar (recall = 1.0,
+          precision ≥ 0.70, F1 ≥ 0.80).
         </p>
       </header>
 
@@ -140,7 +212,13 @@ export default function TriageDashboardPage() {
         </div>
       )}
 
-      {/* Top row: chain integrity + eval action */}
+      {/* --------------------------------------------------------------- */}
+      {/* Head-hash banner — promoted above the fold so compliance and    */}
+      {/* engineering reviewers can copy-verify the chain tip at a glance.*/}
+      {/* --------------------------------------------------------------- */}
+      <ChainHeadBanner view={view} loading={loading} />
+
+      {/* Top row: chain integrity summary + eval action */}
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card
           className={
@@ -177,20 +255,14 @@ export default function TriageDashboardPage() {
           <CardContent>
             <dl className="grid grid-cols-1 gap-2 font-mono text-[11px] md:grid-cols-2">
               <KV
-                icon={<Hash className="h-3 w-3 text-emerald-400" />}
-                label="head_hash_lo"
-                value={
-                  view?.head_hash_lo
-                    ? `0x${view.head_hash_lo}`
-                    : view
-                      ? "(empty)"
-                      : "—"
-                }
-              />
-              <KV
                 icon={<AlertCircle className="h-3 w-3 text-amber-400" />}
                 label="bad_index"
                 value={view?.bad_index != null ? String(view.bad_index) : "—"}
+              />
+              <KV
+                icon={<Hash className="h-3 w-3 text-[#6b8196]" />}
+                label="table_limit"
+                value={String(limit)}
               />
               {view?.bad_reason && (
                 <div className="col-span-full text-rose-300">
@@ -303,6 +375,34 @@ export default function TriageDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* --------------------------------------------------------------- */}
+      {/* Per-detector score plots.                                       */}
+      {/*                                                                 */}
+      {/* One card per detector spec. Each plot renders the full sequence */}
+      {/* of chain scores for that detector family, with a horizontal     */}
+      {/* threshold line at the contracted value. Points above the        */}
+      {/* threshold are coloured by severity.                             */}
+      {/* --------------------------------------------------------------- */}
+      <Card className="mb-6 border-[#1a232e] bg-[#0f151d]">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-[#6b8196]">
+            <LineChart className="h-3.5 w-3.5 text-violet-400" />
+            Detector score traces · threshold lines from triage.py
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {DETECTORS.map((spec) => (
+              <DetectorPlotCard
+                key={spec.key}
+                spec={spec}
+                alerts={alertsByDetector[spec.key] ?? []}
+              />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Alert table */}
       <Card className="mb-6 border-[#1a232e] bg-[#0f151d]">
@@ -492,6 +592,341 @@ export default function TriageDashboardPage() {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Chain head banner
+
+function ChainHeadBanner({
+  view,
+  loading,
+}: {
+  view: AlertChainView | null;
+  loading: boolean;
+}) {
+  const ok = view?.chain_ok === true;
+  const broken = view !== null && view.chain_ok === false;
+
+  let tone = "border-[#1a232e] bg-[#0a0e14]";
+  let iconColor = "text-[#6b8196]";
+  let statusLabel = "loading…";
+  let statusText = "text-[#6b8196]";
+
+  if (ok) {
+    tone = "border-emerald-900/50 bg-emerald-950/10";
+    iconColor = "text-emerald-400";
+    statusLabel = "chain verified";
+    statusText = "text-emerald-300";
+  } else if (broken) {
+    tone = "border-rose-900/60 bg-rose-950/15";
+    iconColor = "text-rose-400";
+    statusLabel = "chain broken";
+    statusText = "text-rose-300";
+  }
+
+  const fullHash = view?.head_hash_lo ?? "";
+  const display = fullHash ? `0x${fullHash}` : view ? "(empty chain)" : "—";
+
+  return (
+    <div
+      className={`mb-4 rounded border px-4 py-3 ${tone}`}
+      data-testid="triage-head-hash-banner"
+    >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Hash className={`h-4 w-4 flex-none ${iconColor}`} />
+        <div className="min-w-0 flex-1">
+          <div className="font-mono text-[10px] uppercase tracking-widest text-[#6b8196]">
+            alert-chain head · BLAKE2b-128 low half
+          </div>
+          <div
+            className="mt-0.5 break-all font-mono text-xs text-[#e4edf5]"
+            title={display}
+          >
+            {display}
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1 whitespace-nowrap">
+          <span
+            className={`font-mono text-[10px] uppercase tracking-wider ${statusText}`}
+          >
+            {loading ? "reading…" : statusLabel}
+          </span>
+          <span className="font-mono text-[10px] text-[#6b8196]">
+            {view ? `${view.n_records.toLocaleString()} records` : "—"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Per-detector plot
+//
+// Renders a small SVG line+scatter of all chain scores for one detector
+// family against its contracted threshold. We intentionally avoid a chart
+// library here — an embedded SVG keeps the bundle small and gives us exact
+// control over the threshold line, which is the whole point of the widget.
+
+function DetectorPlotCard({
+  spec,
+  alerts,
+}: {
+  spec: DetectorSpec;
+  alerts: AlertSummary[];
+}) {
+  const scores = alerts
+    .map((a) => a.score)
+    .filter((s) => Number.isFinite(s));
+
+  const hasData = scores.length > 0;
+  const maxScore = hasData ? Math.max(...scores, spec.threshold) : spec.threshold;
+  const minScore = hasData ? Math.min(...scores, 0) : 0;
+
+  // Reserve a little headroom above the largest point so the threshold line
+  // doesn't clip at the top of the chart on dense alert windows.
+  const yTop = Math.max(spec.threshold, maxScore) * 1.15;
+  const yBot = Math.min(0, minScore);
+  const yRange = Math.max(1e-9, yTop - yBot);
+
+  const W = 320;
+  const H = 140;
+  const PADL = 30;
+  const PADR = 8;
+  const PADT = 8;
+  const PADB = 22;
+  const innerW = W - PADL - PADR;
+  const innerH = H - PADT - PADB;
+
+  const n = alerts.length;
+  const xFor = (i: number) => {
+    if (n <= 1) return PADL + innerW / 2;
+    return PADL + (i / (n - 1)) * innerW;
+  };
+  const yFor = (s: number) => {
+    const norm = (s - yBot) / yRange;
+    return PADT + (1 - norm) * innerH;
+  };
+
+  const thresholdY = yFor(spec.threshold);
+  const zeroY = yFor(0);
+
+  const linePath =
+    n > 0
+      ? alerts
+          .map((a, i) => {
+            const x = xFor(i);
+            const y = yFor(a.score);
+            return `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+          })
+          .join(" ")
+      : "";
+
+  const overThresholdCount = alerts.filter(
+    (a) => a.score >= spec.threshold,
+  ).length;
+  const latest = alerts.length > 0 ? alerts[alerts.length - 1] : null;
+  const latestOver = latest != null && latest.score >= spec.threshold;
+
+  return (
+    <div
+      className={`rounded border p-3 ${
+        latestOver
+          ? "border-rose-500/40 bg-rose-500/5"
+          : overThresholdCount > 0
+            ? "border-amber-500/30 bg-amber-500/5"
+            : "border-[#1f2a38] bg-[#0a0e14]"
+      }`}
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-wider text-[#6b8196]">
+            {spec.family}
+          </div>
+          <div className="mt-0.5 flex items-center gap-1 font-mono text-xs text-[#e4edf5]">
+            <TrendingUp className="h-3 w-3 text-violet-400" />
+            {spec.label}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="font-mono text-[9px] uppercase tracking-wider text-[#6b8196]">
+            {spec.threshold_label}
+          </div>
+          <div className="font-mono text-xs text-amber-300">
+            ≥ {spec.threshold.toFixed(2)}
+          </div>
+        </div>
+      </div>
+
+      {hasData ? (
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          className="h-[140px] w-full"
+          role="img"
+          aria-label={`${spec.label} score trace`}
+        >
+          {/* y-axis */}
+          <line
+            x1={PADL}
+            y1={PADT}
+            x2={PADL}
+            y2={H - PADB}
+            stroke="#1f2a38"
+            strokeWidth={1}
+          />
+          {/* x-axis (at zero or bottom) */}
+          <line
+            x1={PADL}
+            y1={Math.min(H - PADB, Math.max(PADT, zeroY))}
+            x2={W - PADR}
+            y2={Math.min(H - PADB, Math.max(PADT, zeroY))}
+            stroke="#1f2a38"
+            strokeWidth={1}
+          />
+
+          {/* threshold line */}
+          <line
+            x1={PADL}
+            y1={thresholdY}
+            x2={W - PADR}
+            y2={thresholdY}
+            stroke="#f59e0b"
+            strokeWidth={1}
+            strokeDasharray="4 3"
+          />
+          <text
+            x={W - PADR}
+            y={Math.max(PADT + 9, thresholdY - 3)}
+            textAnchor="end"
+            fontSize={9}
+            fontFamily="ui-monospace, SFMono-Regular, monospace"
+            fill="#f59e0b"
+          >
+            {spec.threshold_label} = {spec.threshold.toFixed(2)}
+          </text>
+
+          {/* y-axis ticks */}
+          <text
+            x={PADL - 4}
+            y={PADT + 8}
+            textAnchor="end"
+            fontSize={9}
+            fontFamily="ui-monospace, SFMono-Regular, monospace"
+            fill="#6b8196"
+          >
+            {yTop.toFixed(1)}
+          </text>
+          <text
+            x={PADL - 4}
+            y={H - PADB + 2}
+            textAnchor="end"
+            fontSize={9}
+            fontFamily="ui-monospace, SFMono-Regular, monospace"
+            fill="#6b8196"
+          >
+            {yBot.toFixed(1)}
+          </text>
+
+          {/* score line */}
+          {n > 1 && (
+            <path
+              d={linePath}
+              fill="none"
+              stroke="#8b5cf6"
+              strokeWidth={1.25}
+            />
+          )}
+
+          {/* score points, coloured by threshold crossing */}
+          {alerts.map((a, i) => {
+            const over = a.score >= spec.threshold;
+            const sev = (a.severity || "").toLowerCase();
+            const critical =
+              sev === "critical" || sev === "alert" || sev === "high";
+            const fill = over
+              ? critical
+                ? "#f43f5e"
+                : "#f59e0b"
+              : "#8b5cf6";
+            return (
+              <circle
+                key={a.seq_no}
+                cx={xFor(i)}
+                cy={yFor(a.score)}
+                r={over ? 2.8 : 2}
+                fill={fill}
+                stroke={over ? "#0a0e14" : "none"}
+                strokeWidth={0.5}
+              >
+                <title>
+                  seq #{a.seq_no} · score {a.score.toFixed(2)} · {a.severity}
+                  {"\n"}
+                  {a.detail}
+                </title>
+              </circle>
+            );
+          })}
+
+          {/* x-axis label */}
+          <text
+            x={PADL + innerW / 2}
+            y={H - 5}
+            textAnchor="middle"
+            fontSize={9}
+            fontFamily="ui-monospace, SFMono-Regular, monospace"
+            fill="#6b8196"
+          >
+            seq_no (chain order) · n={n}
+          </text>
+        </svg>
+      ) : (
+        <div className="flex h-[140px] items-center justify-center rounded border border-dashed border-[#1f2a38] font-mono text-[10px] text-[#4d617a]">
+          no alerts for this detector in the chain
+        </div>
+      )}
+
+      <div className="mt-2 grid grid-cols-3 gap-2 font-mono text-[10px]">
+        <div className="rounded border border-[#1f2a38] bg-[#0a0e14] p-1.5">
+          <div className="text-[9px] uppercase tracking-wider text-[#6b8196]">
+            alerts
+          </div>
+          <div className="text-[#e4edf5]">{n}</div>
+        </div>
+        <div
+          className={`rounded border p-1.5 ${
+            overThresholdCount > 0
+              ? "border-amber-500/40 bg-amber-500/5 text-amber-300"
+              : "border-[#1f2a38] bg-[#0a0e14] text-[#e4edf5]"
+          }`}
+        >
+          <div className="text-[9px] uppercase tracking-wider text-[#6b8196]">
+            over thresh
+          </div>
+          <div>{overThresholdCount}</div>
+        </div>
+        <div
+          className={`rounded border p-1.5 ${
+            latestOver
+              ? "border-rose-500/40 bg-rose-500/5 text-rose-300"
+              : "border-[#1f2a38] bg-[#0a0e14] text-[#e4edf5]"
+          }`}
+        >
+          <div className="text-[9px] uppercase tracking-wider text-[#6b8196]">
+            latest score
+          </div>
+          <div>
+            {latest ? latest.score.toFixed(2) : "—"}
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-2 text-[10px] leading-snug text-[#6b8196]">
+        {spec.description}
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 function KV({
   icon,

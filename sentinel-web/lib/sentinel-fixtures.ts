@@ -10,6 +10,7 @@
 
 import type {
   AlertChainView,
+  AttributionView,
   ComplianceCrosswalkResponse,
   ComplianceEntry,
   ComplianceSnapshot,
@@ -17,6 +18,9 @@ import type {
   DigestSummary,
   DrillCatalog,
   DrillKind,
+  ProposedPatchView,
+  RcaCompareView,
+  RcaPromptView,
   RiskGateConfig,
   RunDigestResponse,
   TamperDemoResult,
@@ -535,6 +539,155 @@ export const FIXTURE_RCA_RUN: RunDigestResponse = {
   markdown_path: "artifacts/rca/2026-04-21.md",
   json_path: "artifacts/rca/2026-04-21.json",
   anomaly_count: 3,
+};
+
+export const FIXTURE_RCA_PROMPT: RcaPromptView = {
+  date: "2026-04-21",
+  backend: "template",
+  model: "deterministic",
+  prompt_template: `You are the on-call SRE for a hardware-assisted trading system.
+Produce a Markdown operational digest for the trading day described below.
+
+Rules:
+- Cite each anomaly by its \`\`kind\`\` and the exact \`\`detail\`\` text.
+- If there are no anomalies, say so in one sentence.
+- Candidate root causes must be grounded in the feature dict only.
+- Do not invent metrics that aren't in the input.
+- Section headers: \`\`## Headline\`\`, \`\`## Anomalies\`\`, \`\`## Candidate
+  root causes\`\`, \`\`## Recommended actions\`\`, \`\`## Chain integrity\`\`.
+- Keep each section <= 120 words.
+- Use bullet points only inside Anomalies and Recommended actions.
+
+Feature bundle (JSON):
+
+\`\`\`json
+{features_json}
+\`\`\`
+`,
+  prompt: `You are the on-call SRE for a hardware-assisted trading system.
+Produce a Markdown operational digest for the trading day described below.
+[... template interpolated with today's feature bundle ...]`,
+  prompt_sha256:
+    "1a4c7e2f9b8d3c0a5f6e92b1d4c7e8a39b2c4d5e6f0a1b2c3d4e5f60718293a4b",
+  prompt_sha256_matches_stored: true,
+};
+
+export const FIXTURE_RCA_PROPOSED_PATCH: ProposedPatchView = {
+  schema: "sentinel-hft/config-proposal/1",
+  date: "2026-04-21",
+  review_only: true,
+  patch: [
+    {
+      op: "replace",
+      path: "/triage/latency_zscore/z_threshold",
+      value: 3.5,
+      rationale:
+        "stage core p99=5.8µs exceeds 5.0µs guard -- propose tightening z-score threshold 4.0 → 3.5 so the triage agent fires earlier on the next excursion.",
+      anomaly_kind: "stage_latency_p99",
+    },
+    {
+      op: "replace",
+      path: "/risk_gate/refill_per_second",
+      value: 750,
+      rationale:
+        "reject rate 31% > 25% baseline -- propose throttling refill to 750/s so the engine sheds before the reject gate trips.",
+      anomaly_kind: "reject_rate_high",
+    },
+  ],
+  summary:
+    "2 changes proposed in response to 2 anomaly kind(s): reject_rate_high, stage_latency_p99 (review-only).",
+  patch_hash_sha256:
+    "d4e5f60718293a4b1a4c7e2f9b8d3c0a5f6e92b1d4c7e8a39b2c4d5e6f0a1b2c3",
+};
+
+export const FIXTURE_RCA_COMPARE: RcaCompareView = {
+  date: "2026-04-21",
+  backend: "template",
+  model: "deterministic",
+  live_markdown: FIXTURE_RCA_DETAIL.markdown,
+  deterministic_markdown: FIXTURE_RCA_DETAIL.markdown,
+  identical: true,
+  anomaly_count: 3,
+  prompt_sha256: FIXTURE_RCA_DETAIL.prompt_sha256,
+};
+
+// ---- Phase 7 alpha attribution ------------------------------------------
+//
+// Three lenses, all observational — the pipeline never reshapes decisions,
+// it only explains what happened and cites the exact trace records that
+// back each claim. Numbers below mirror a real local ``build_features``
+// run over the toxic-flow + kill-drill reports from 2026-04-21.
+
+export const FIXTURE_RCA_ATTRIBUTION: AttributionView = {
+  date: "2026-04-21",
+  backend: "template",
+  pass_count: 2,
+  fail_count: 1,
+  records: [
+    {
+      kind: "fill_quality_vs_latency",
+      drill: "toxic_flow",
+      metric: "pass_rate",
+      value: 0.7554,
+      baseline: 0.7,
+      passes: true,
+      headline:
+        "9,705/12,847 intents landed (75.5%); bottleneck: core @ 1,807 ns p99",
+      detail:
+        "Fill-quality = passed / intents. Below 70% the pipeline is a fast veto, not a fast executor. p99 in isolation does not imply alpha — a sub-10µs pipeline that rejects 50% of the strategy's intents is leaking selection.",
+      cited_records: [
+        "toxic_flow_report.json::throughput.intents=12847",
+        "toxic_flow_report.json::throughput.passed=9705",
+        "toxic_flow_report.json::throughput.rejected=3142",
+        "toxic_flow_report.json::latency_ns.p99=4318",
+        "toxic_flow_report.json::stage_p99_ns.core=1807",
+        "audit.aud::head_hash_lo=9f2c1b4a7d8e3f12…",
+      ],
+    },
+    {
+      kind: "reject_survival",
+      drill: "latency",
+      metric: "survival_rate",
+      value: 0.0219,
+      baseline: 0.05,
+      passes: false,
+      headline:
+        "876/40,000 intents blocked (2.2%); dominant reason: ORDER_SIZE (412)",
+      detail:
+        "Reject-survival ledger. Each rejected intent is an averted hit — either adverse selection (TOXIC_FLOW), a bad-size guard (NOTIONAL_LIMIT / POSITION_LIMIT / ORDER_SIZE), a venue-rate guard (RATE_LIMITED), or the kill switch (attributed separately in #3). Survival is below the 5.0% floor — pipeline is passing through almost everything, which on a latency drill with no toxic-flow injector is expected, but tune per-venue before promoting.\n  ORDER_SIZE: 412\n  NOTIONAL_LIMIT: 284\n  RATE_LIMITED: 180",
+      cited_records: [
+        "latency_report.json::throughput.intents=40000",
+        "latency_report.json::throughput.rejected=876",
+        "latency_report.json::reject_histogram.ORDER_SIZE=412",
+        "latency_report.json::reject_histogram.NOTIONAL_LIMIT=284",
+        "latency_report.json::reject_histogram.RATE_LIMITED=180",
+        "audit.aud::head_hash_lo=7c4a2e9d1b8f5a06…",
+      ],
+    },
+    {
+      kind: "kill_drill_survival",
+      drill: "kill_drill",
+      metric: "kill_survival_rate",
+      value: 1.0,
+      baseline: 1.0,
+      passes: true,
+      headline:
+        "kill trip at intent #25500 (318 ns); 4,217/4,217 post-kill intents caught (100.0%)",
+      detail:
+        "Kill-switch survival = (post_kill_rejects) / (decisions_after_kill). Any record with reason != KILL_SWITCH after the kill trip is a blast-radius leak and must be escalated to the hardware reviewer. SLO check: kill_latency_within_slo = True.",
+      cited_records: [
+        "kill_drill_report.json::kill_triggered=true",
+        "kill_drill_report.json::kill_intent_idx=25500",
+        "kill_drill_report.json::kill_latency_ns=318",
+        "kill_drill_report.json::kill_latency_within_slo=True",
+        "kill_drill_report.json::decisions_before_kill=25499",
+        "kill_drill_report.json::decisions_after_kill=4217",
+        "kill_drill_report.json::rejects_after_kill_mismatch=0",
+        "audit.aud::seq_no range post-kill [25501,29717]",
+        "audit.aud::head_hash_lo=3e1d8c2f9a4b6d70…",
+      ],
+    },
+  ],
 };
 
 // ---- AI triage -----------------------------------------------------------

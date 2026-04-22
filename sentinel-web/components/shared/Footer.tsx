@@ -34,7 +34,7 @@ const socialLinks = [
 
 export function Footer() {
   // The /sentinel/* routes own their own chrome end-to-end, and the
-  // home page (`/`) carries its own Keyrock-styled footer. Hide the
+  // home page (`/`) carries its own Sentinel-HFT v2.0 footer. Hide the
   // global footer in those places so we don't double up.
   const pathname = usePathname();
   if (pathname === "/" || pathname?.startsWith("/sentinel")) {

@@ -15,12 +15,16 @@
 
 import type {
   AlertChainView,
+  AttributionView,
   ComplianceCrosswalkResponse,
   ComplianceSnapshot,
   DigestDetail,
   DigestSummary,
   DrillCatalog,
   DrillKind,
+  ProposedPatchView,
+  RcaCompareView,
+  RcaPromptView,
   RiskGateConfig,
   RunDigestRequest,
   RunDigestResponse,
@@ -35,8 +39,12 @@ import {
   FIXTURE_COMPLIANCE_SNAPSHOT,
   FIXTURE_DRILL_CATALOG,
   FIXTURE_LIVE_COUNTER_KEYS,
+  FIXTURE_RCA_ATTRIBUTION,
+  FIXTURE_RCA_COMPARE,
   FIXTURE_RCA_DETAIL,
   FIXTURE_RCA_LIST,
+  FIXTURE_RCA_PROMPT,
+  FIXTURE_RCA_PROPOSED_PATCH,
   FIXTURE_RCA_RUN,
   FIXTURE_RISK_DEFAULTS,
   FIXTURE_TAMPER_DEMO,
@@ -54,8 +62,18 @@ const WS_BASE =
   API_BASE.replace(/^http/, "ws");
 
 /** Fired whenever a request resolves so pages can surface "live" vs
- *  "fixture" provenance. ``detail`` is "live" or "fixture". */
-function announceSource(source: "live" | "fixture", reason?: string): void {
+ *  "replay" vs "fixture" provenance.
+ *
+ *  - "live"    — backend reachable, data is the running pipeline.
+ *  - "replay"  — backend reachable, data is being replayed from a
+ *                captured pcap (overrides.pcap was set on the request).
+ *  - "fixture" — backend unreachable, deterministic in-memory fixture
+ *                serves the UI so the public Vercel deployment still
+ *                demonstrates the full UX.
+ */
+type Source = "live" | "replay" | "fixture";
+
+function announceSource(source: Source, reason?: string): void {
   if (typeof window === "undefined") return;
   try {
     window.dispatchEvent(
@@ -66,6 +84,15 @@ function announceSource(source: "live" | "fixture", reason?: string): void {
   }
 }
 
+/** True iff the overrides contain a non-empty pcap reference, in which
+ *  case a successful backend round-trip is `replay` rather than `live`.
+ *  Centralised so every entry point honours the same contract. */
+function isReplayOverrides(overrides: Record<string, unknown> | undefined): boolean {
+  if (!overrides) return false;
+  const v = overrides.pcap;
+  return typeof v === "string" && v.trim().length > 0;
+}
+
 /** Run ``fn``; if it throws (network / CORS / 5xx / abort) return the
  *  fixture instead and announce ``fixture`` provenance. The reason is
  *  included so consumers can debug. */
@@ -73,10 +100,11 @@ async function withFallback<T>(
   fn: () => Promise<T>,
   fallback: T,
   label: string,
+  liveAs: Source = "live",
 ): Promise<T> {
   try {
     const result = await fn();
-    announceSource("live", label);
+    announceSource(liveAs, label);
     return result;
   } catch (err) {
     announceSource("fixture", `${label}: ${(err as Error).message ?? err}`);
@@ -114,6 +142,9 @@ export async function runDrill<R = Record<string, unknown>>(
   kind: DrillKind,
   overrides: Record<string, unknown> = {},
 ): Promise<{ drill: DrillKind; report: R }> {
+  // pcap presence flips the announced provenance from "live" to "replay"
+  // so the ProvenancePill flips its badge without the page caring.
+  const liveAs: Source = isReplayOverrides(overrides) ? "replay" : "live";
   return withFallback(
     async () => {
       const r = await fetch(`${API_BASE}/api/drills/${kind}/run`, {
@@ -126,6 +157,7 @@ export async function runDrill<R = Record<string, unknown>>(
     },
     { drill: kind, report: fixtureReportFor(kind) as R },
     `runDrill(${kind})`,
+    liveAs,
   );
 }
 
@@ -272,6 +304,79 @@ export async function runRcaDigest(
   );
 }
 
+export async function getRcaPrompt(isoDate: string): Promise<RcaPromptView> {
+  return withFallback(
+    async () => {
+      const r = await fetch(
+        `${API_BASE}/api/ai/rca/${encodeURIComponent(isoDate)}/prompt`,
+        { cache: "no-store" },
+      );
+      if (!r.ok) throw new Error(`getRcaPrompt(${isoDate}): ${r.status}`);
+      return r.json() as Promise<RcaPromptView>;
+    },
+    { ...FIXTURE_RCA_PROMPT, date: isoDate },
+    `getRcaPrompt(${isoDate})`,
+  );
+}
+
+export async function getProposedPatch(
+  isoDate: string,
+): Promise<ProposedPatchView> {
+  return withFallback(
+    async () => {
+      const r = await fetch(
+        `${API_BASE}/api/ai/rca/${encodeURIComponent(isoDate)}/proposed-patch`,
+        { cache: "no-store" },
+      );
+      if (!r.ok) throw new Error(`getProposedPatch(${isoDate}): ${r.status}`);
+      return r.json() as Promise<ProposedPatchView>;
+    },
+    { ...FIXTURE_RCA_PROPOSED_PATCH, date: isoDate },
+    `getProposedPatch(${isoDate})`,
+  );
+}
+
+export async function getRcaCompare(isoDate: string): Promise<RcaCompareView> {
+  return withFallback(
+    async () => {
+      const r = await fetch(
+        `${API_BASE}/api/ai/rca/${encodeURIComponent(isoDate)}/compare`,
+        { cache: "no-store" },
+      );
+      if (!r.ok) throw new Error(`getRcaCompare(${isoDate}): ${r.status}`);
+      return r.json() as Promise<RcaCompareView>;
+    },
+    { ...FIXTURE_RCA_COMPARE, date: isoDate },
+    `getRcaCompare(${isoDate})`,
+  );
+}
+
+/**
+ * Phase 7 alpha attribution. Explains *why* the day's trading
+ * outcome landed where it did, citing the exact drill fields and
+ * audit seq_no ranges so a compliance engineer can chase the claim
+ * back to raw artifacts without trusting the LLM.
+ *
+ * Lenses: fill-quality-vs-latency, reject-survival, and (only for
+ * kill-drill runs) kill-survival blast radius.
+ */
+export async function getRcaAttribution(
+  isoDate: string,
+): Promise<AttributionView> {
+  return withFallback(
+    async () => {
+      const r = await fetch(
+        `${API_BASE}/api/ai/rca/${encodeURIComponent(isoDate)}/attribution`,
+        { cache: "no-store" },
+      );
+      if (!r.ok) throw new Error(`getRcaAttribution(${isoDate}): ${r.status}`);
+      return r.json() as Promise<AttributionView>;
+    },
+    { ...FIXTURE_RCA_ATTRIBUTION, date: isoDate },
+    `getRcaAttribution(${isoDate})`,
+  );
+}
+
 export async function getTriageAlerts(
   opts: { limit?: number } = {},
 ): Promise<AlertChainView> {
@@ -384,7 +489,13 @@ export function streamDrill(
     socket.addEventListener("open", () => {
       opened = true;
       clearTimeout(openTimer);
-      announceSource("live", `streamDrill(${kind})`);
+      // If the start frame carries a pcap path the backend replays a
+      // captured run instead of generating fresh ticks — surface that
+      // distinction up to the ProvenancePill so the operator can see at
+      // a glance whether the chart they're watching is live ingest or
+      // bit-for-bit replay of an earlier capture.
+      const liveAs: Source = isReplayOverrides(overrides) ? "replay" : "live";
+      announceSource(liveAs, `streamDrill(${kind})`);
       try {
         socket?.send(JSON.stringify(overrides));
       } catch {
