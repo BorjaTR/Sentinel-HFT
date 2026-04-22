@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { Download, Package, FileText, Loader2, AlertTriangle } from "lucide-react";
+import { Download, Package, FileText, Loader2, AlertTriangle, Terminal } from "lucide-react";
 
 interface ManifestEntry {
   name: string;
@@ -56,8 +56,30 @@ export function OfflineBundleDownload() {
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [prodLocalhostGuard, setProdLocalhostGuard] = useState(false);
 
   useEffect(() => {
+    // Prod-host guard: if NEXT_PUBLIC_SENTINEL_API_BASE is still pointing at
+    // localhost (the default) but the browser is on a non-local hostname
+    // (Vercel, a staging domain, anything else), the manifest fetch will
+    // always fail with "Load failed" and the download link would 404 too.
+    // Show a friendly "run it locally" note instead of a red error banner.
+    if (typeof window !== "undefined") {
+      const host = window.location.hostname;
+      const isLocalHost =
+        host === "localhost" ||
+        host === "127.0.0.1" ||
+        host === "0.0.0.0" ||
+        host.endsWith(".local");
+      const isLocalApi =
+        API_BASE.includes("localhost") || API_BASE.includes("127.0.0.1");
+      if (isLocalApi && !isLocalHost) {
+        setProdLocalhostGuard(true);
+        setLoading(false);
+        return;
+      }
+    }
+
     const ctrl = new AbortController();
     (async () => {
       try {
@@ -86,6 +108,42 @@ export function OfflineBundleDownload() {
     () => (manifest ? groupEntries(manifest.entries) : {}),
     [manifest],
   );
+
+  // The bundle is a live server artifact, not a static file shipped with the
+  // Next.js build. On a hosted deploy where the backend isn't reachable, show
+  // a plain-English pointer to running it locally rather than a red banner.
+  if (prodLocalhostGuard) {
+    return (
+      <div className="mt-5 rounded-lg border border-[#1a232e] bg-[#0f151d] p-5">
+        <div className="flex items-start gap-3">
+          <Package className="mt-0.5 h-5 w-5 shrink-0 text-sky-400" />
+          <div>
+            <div className="text-sm font-semibold text-white">
+              Offline bundle — run the server locally to download
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-[#9ab3c8]">
+              The zip is assembled on demand from the server source tree,
+              so it's only available when you're running Sentinel-HFT on
+              your own machine. Clone the repo, start the server, and this
+              page will light up.
+            </p>
+            <div className="mt-3 flex flex-col gap-1 font-mono text-[10px] text-[#6b8196]">
+              <div className="flex items-center gap-2">
+                <Terminal className="h-3 w-3" />
+                git clone https://github.com/BorjaTR/Sentinel-HFT
+              </div>
+              <div className="flex items-center gap-2 pl-5">
+                cd Sentinel-HFT &amp;&amp; make serve
+              </div>
+              <div className="flex items-center gap-2 pl-5">
+                open http://localhost:3000/sentinel/about
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-5 rounded-lg border border-[#1a232e] bg-[#0f151d] p-5">

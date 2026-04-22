@@ -16,8 +16,8 @@ import {
 // roles, not to a single named buyer.
 
 const PRIMARY = {
-  href: "/sentinel/about",
-  label: "What is this?",
+  href: "/sentinel",
+  label: "See the four bad days",
   icon: ScrollText,
 };
 
@@ -46,20 +46,20 @@ const AUDIENCES = [
 
 const DIFFERENTIATORS = [
   {
-    title: "Measured on the chip, not guessed after",
-    body: "Every order carries its own stopwatch through the hardware — one reading per stage, written directly from the FPGA. Nothing is reconstructed after the fact, so the numbers can't drift or be massaged.",
+    title: "Checks run in hardware, not in software",
+    body: "Most trading firms run their safety checks inside the same software that runs the trading system. One bad release on a Friday afternoon and the checks are gone with it. Here they live in a separate hardware circuit — the trading software can't switch them off, bypass them, or accidentally reach around them.",
   },
   {
-    title: "A log nobody can quietly edit",
-    body: "Every decision is stamped with a cryptographic seal that depends on the decision before it. Change one byte anywhere in the log and the seal breaks, pointing at the exact record that was touched. The math is public and independently re-checkable — the same kind used by Bitcoin.",
+    title: "The audit log proves itself",
+    body: "Every decision — approved or blocked — is sealed with a cryptographic seal that depends on the decision before it. Change one byte anywhere in the log and the seal breaks, pointing at the exact record that was touched. The math is public, the same kind Bitcoin uses, and the regulator runs the verifier on their own laptop. No vendor trust required.",
   },
   {
-    title: "Runs on your own machines",
-    body: "Every piece of the product — the scenarios, the plain-English incident explainer, the alert triage, the log verifier — runs on your own hardware. No trading data leaves the building. A local AI explainer is available if you want richer narratives, off by default.",
+    title: "A local AI writes the incident report",
+    body: "The moment an order gets blocked or a kill switch fires, a local AI produces a plain-English write-up — which desk, which rule, which orders, why, and what the regulator will want to see. It runs entirely on your own hardware. No trading data, no order book, no client information ever leaves the building.",
   },
   {
-    title: "Pre-mapped to the rules regulators cite",
-    body: "Nine specific clauses from seven regulators — EU, US, Swiss, Singapore — each mapped to the exact circuit or module that satisfies it. When a regulator asks \"show me the control for MiFID II RTS 6\", you point at one cell and open the file.",
+    title: "The stop button is a physical circuit",
+    body: "Most kill switches are a button in a piece of software that depends on that same software still working. Here the stop is a latched hardware state — a person, or an automatic rule, trips the circuit and the door closes. The trading software cannot unlatch it. Only an operator with the right permission can reopen.",
   },
 ];
 
@@ -76,20 +76,41 @@ export default function Home() {
       <section className="relative overflow-hidden border-b border-[#1a232e]">
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-sky-500/5" />
         <div className="relative mx-auto max-w-6xl px-6 py-20 md:py-28">
-          <h1 className="max-w-4xl text-4xl font-bold leading-[1.1] tracking-tight text-white md:text-6xl">
-            A trading desk's{" "}
-            <span className="text-emerald-400">black box</span>
-            {" "}—{" "}
-            <span className="text-sky-400">in custom silicon</span>.
+          <h1 className="max-w-4xl text-4xl font-bold leading-[1.1] tracking-tight text-white md:text-5xl lg:text-6xl">
+            Sentinel is the{" "}
+            <span className="text-emerald-400">safety layer</span>
+            {" "}between your trading desk and the{" "}
+            <span className="text-sky-400">market</span>.
           </h1>
           <p className="mt-6 max-w-3xl text-lg leading-relaxed text-[#9ab3c8]">
-            Every order, every decision, every safety check — measured
-            in nanoseconds, logged in a form no one can quietly edit
-            later, and pre-mapped to the rules your regulators cite.
-            Two doors in: trading desks see four bad days and how the
-            system catches each one. Hardware engineers see the circuits,
-            the timing budgets, and the synthesis reports.
+            Every desk already has one. What's different about this one:
           </p>
+          <ul className="mt-5 max-w-3xl space-y-3 text-base leading-relaxed text-[#9ab3c8]">
+            <li className="flex gap-3">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+              <span>
+                <span className="font-semibold text-white">Checks run in hardware</span>, not inside the trading software — a bad release can't switch them off.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+              <span>
+                <span className="font-semibold text-white">The audit log proves itself.</span> The regulator verifies it on their own laptop, in minutes.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+              <span>
+                <span className="font-semibold text-white">A local AI writes the incident report in plain English.</span> On your hardware. No data leaves the building.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+              <span>
+                <span className="font-semibold text-white">The stop button is a physical circuit.</span> It works when the software doesn't.
+              </span>
+            </li>
+          </ul>
 
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <Link
@@ -208,24 +229,24 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-6 py-12">
           <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
             <SpecCell
-              metric="322 MHz"
-              label="CMAC clock"
-              detail="100G Ethernet, U55C"
+              metric="< 1 μs"
+              label="Per order, in hardware"
+              detail="checked before it leaves the building"
             />
             <SpecCell
-              metric="100 MHz"
-              label="Order path"
-              detail="market data in → decision → risk check → order out"
+              metric="2 min"
+              label="Audit verification"
+              detail="the regulator runs it on their own laptop"
             />
             <SpecCell
               metric="9 clauses"
-              label="Compliance crosswalk"
+              label="7 regulators, 4 jurisdictions"
               detail="MiFID II · CFTC · FINRA · SEC · MAR · FINMA · MAS"
             />
             <SpecCell
-              metric="BLAKE2b"
-              label="Audit chain"
-              detail="tamper-evident, byte-level verifier"
+              metric="0 bytes"
+              label="Leave the building"
+              detail="incident AI runs on your own hardware"
             />
           </div>
         </div>

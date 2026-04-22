@@ -58,6 +58,7 @@ const STATUS_TONE: Record<string, string> = {
 const JURISDICTION_FLAG: Record<string, string> = {
   EU: "🇪🇺",
   US: "🇺🇸",
+  UK: "🇬🇧",
   CH: "🇨🇭",
   SG: "🇸🇬",
   Global: "🌐",
@@ -192,16 +193,18 @@ export default function RegulationsPage() {
         <div className="flex items-start justify-between gap-6">
           <div className="flex-1">
             <h1 className="font-mono text-xs uppercase tracking-widest text-[#4d617a]">
-              Workstream 3 · Regulation crosswalk · Trading-desk / compliance view
+              Regulations
             </h1>
             <h2 className="mt-2 text-3xl font-semibold text-[#e4edf5]">
-              What each regulation does, and what&apos;s ticking up right now
+              Every rule the regulator cites, mapped to the exact control
+              that satisfies it.
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[#9ab3c8]">
-              Static map of 9 regulation clauses to the primitives Sentinel-HFT
-              ships (top). Live observational counters from the host compliance
-              stack (bottom) &mdash; pick a drill and watch the counters move.
-              The stack never modifies a drill&apos;s outcome; it only observes.
+              One row per rule. Click any row to see the file in our system
+              that handles it, what goes in the audit log when it fires, and
+              what today&apos;s counters look like. When a regulator asks
+              &ldquo;show me your control for MiFID II RTS 6&rdquo;, that
+              row is the answer.
             </p>
           </div>
           <RegulatorExportButton />
@@ -230,17 +233,29 @@ export default function RegulationsPage() {
         progress={progress}
       />
 
-      {/* ================== Live Counters ================== */}
+      {/* ================== Live Counters (collapsible) ================== */}
       <section className="mb-10 no-print">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-[#4d617a]">
-              Live
+        <details className="group rounded-lg border border-[#1a232e] bg-[#0f151d]">
+          <summary className="cursor-pointer list-none p-4 transition hover:bg-[#131c27]">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-widest text-[#4d617a]">
+                  Optional — for compliance teams
+                </div>
+                <h3 className="mt-1 text-sm font-semibold text-[#e4edf5]">
+                  Run a drill and watch the counters move in real time
+                </h3>
+                <p className="mt-1 max-w-2xl text-xs text-[#6b8196]">
+                  Pick one of four drills and watch the system catch a real-looking
+                  problem live. The counters only observe — they never change
+                  the drill&apos;s outcome.
+                </p>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-[#4d617a] transition group-open:rotate-90" />
             </div>
-            <h3 className="mt-1 text-lg font-semibold text-[#e4edf5]">
-              Observational counters
-            </h3>
-          </div>
+          </summary>
+        <div className="border-t border-[#1a232e] p-4">
+        <div className="mb-3 flex items-center justify-end">
           <div className="flex items-center gap-2">
             {activeDrill ? (
               <Button
@@ -346,24 +361,23 @@ export default function RegulationsPage() {
             alertCount={marAlertCount}
           />
         </div>
+        </div>
+        </details>
       </section>
 
       {/* ================== Static Crosswalk ================== */}
       <section>
         <div className="mb-3">
           <div className="font-mono text-[10px] uppercase tracking-widest text-[#4d617a]">
-            Static
+            The table
           </div>
           <h3 className="mt-1 text-lg font-semibold text-[#e4edf5]">
-            Regulation → primitive → artefact
+            One row per rule, grouped by regulator
           </h3>
           <p className="mt-1 text-xs text-[#6b8196]">
-            Ordered by jurisdiction. Source of truth:{" "}
-            <span className="font-mono text-[#9ab3c8]">
-              sentinel_hft/compliance/crosswalk.py
-            </span>
-            . Click any row for the exact code path and artefact that
-            satisfies that clause.
+            Click any row to open the exact control that satisfies it —
+            which file, what the audit log records, and what today&apos;s
+            counters say.
           </p>
         </div>
 
@@ -531,16 +545,16 @@ function CrossJurisdictionRollup({
       <div className="mb-3 flex items-end justify-between">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-[#4d617a]">
-            Cross-jurisdictional rollup
+            Coverage by region
           </div>
           <h3 className="mt-1 text-lg font-semibold text-[#e4edf5]">
-            Clause coverage by regulator
+            Which regulators we cover today
           </h3>
           <p className="mt-1 max-w-3xl text-xs text-[#6b8196]">
-            One badge per regulator. Coverage % = (implemented + reused) /
-            total clauses mapped. ``partial`` and ``stub`` count against
-            coverage until they ship. Missing regulators show the slot
-            with a zero count so the gap is visible, not hidden.
+            One badge per regulator. The percentage is the share of clauses
+            we have a shipping control for. Regions we haven&apos;t mapped
+            yet show an empty slot rather than being hidden — UK (FCA) is
+            next up, planned to mirror the EU clauses post-Brexit.
           </p>
         </div>
         <div className="text-right font-mono text-[10px] text-[#6b8196]">
