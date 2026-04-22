@@ -4,17 +4,124 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-2.2.0-green.svg)](https://github.com/BorjaTR/Sentinel-HFT)
 
-**Hardware execution observability for crypto trading infrastructure.**
+**FPGA observability and risk-evidence appliance for crypto HFT.**
 
-Sentinel-HFT wraps your FPGA trading cores with instrumentation, captures cycle-accurate traces, enforces risk controls, and generates AI-powered latency analysis reports. It provides comprehensive tooling for latency verification, regression testing, fault injection, and real-time monitoring.
+Sentinel-HFT is a tick-to-trade pipeline in RTL + Python that wraps a
+co-located FPGA trading core with (a) cycle-accurate latency
+attribution, (b) a host-hashed audit trail over every risk-gate
+decision (on-chip serialiser + off-chip BLAKE2b chain; see
+§"FPGA target" and the core-audit report for the full scope), and
+(c) a local-only AI root-cause explainer. It is shaped for firms
+running market-making on Deribit LD4, Hyperliquid, and Solana
+block builders where nanosecond attribution pays and DORA requires
+you to prove it later.
 
-### Who Is This For?
+## Four heroes
 
-- **Crypto HFT firms** — Debug and optimize FPGA execution paths
-- **MEV searchers** — Understand latency in transaction ordering
-- **L2 sequencers** — Analyze sequencer performance
-- **FPGA engineers** — Verify RTL timing behavior
-- **Quant developers** — Regression test trading systems
+1. **Deribit LD4 tick-to-trade demo** (`sentinel-hft deribit demo`) — a
+   deterministic 20k-tick run across BTC/ETH perps and options that
+   produces the four artifacts a regulator or an interviewer can diff
+   against a reference: a v1.2 trace (64-byte records with per-stage
+   attribution), a hash-chained audit log, a DORA bundle, and a
+   markdown summary.
+2. **Host-hashed risk audit trail** — the on-chip `risk_audit_log` is
+   an ordered, monotonically-sequenced serialiser of every risk
+   decision with an in-band `REC_OVERFLOW` marker on FIFO full; the
+   host then BLAKE2b-chains the stream off-chip, so any insert,
+   delete, or reorder breaks the chain (Wave 1 "Option A" from the
+   core audit; a synthesisable in-fabric BLAKE2b core is a planned
+   post-v1.0.0 item). The verifier produces a DORA-shaped bundle
+   suitable for an incident report.
+3. **Local-only AI RCA** — root-cause analysis that never ships trace
+   content off-host. Ships as a rule-based explainer with optional
+   local LLM hook; no Anthropic / OpenAI API key required.
+4. **Hyperliquid use-case suite** (`sentinel-hft hl …`) — four
+   end-to-end demonstrations on top of the shared pipeline, each
+   answering a specific operational question and each emitting a
+   self-contained HTML report (inline SVG, no external JS, opens
+   offline):
+   (a) toxic-flow rejection, (b) volatility kill-switch drill with
+   spike-to-latch latency, (c) wire-to-wire latency attribution by
+   pipeline stage, (d) a daily three-session DORA evidence bundle.
+   A `sentinel-hft hl demo` one-liner runs all four plus stitches a
+   cover dashboard. Full reference in
+   [`docs/USE_CASES.md`](docs/USE_CASES.md).
+
+## FPGA target
+
+The RTL under [`rtl/`](rtl/) is wired through
+[`fpga/u55c/sentinel_u55c_top.sv`](fpga/u55c/sentinel_u55c_top.sv) to
+an **AMD Alveo U55C** (`xcu55c-fsvh2892-2L-e`) at 100 MHz, with XDC
+constraints, Vivado batch scripts, and a CI elaboration check. See
+[`fpga/u55c/README.md`](fpga/u55c/README.md) for the build flow.
+
+What is wired in v2.2 (post-audit Waves 0-3):
+
+- `sentinel_shell_v12` + `risk_gate` + `risk_audit_log` on the
+  100 MHz datapath clock, pblocked into SLR0 to keep tick-to-trade
+  inside one super-logic region.
+- A real dual-clock CMAC bridge: the 322.265625 MHz LBUS domain
+  from the CMAC hard IP is crossed into the 100 MHz datapath via
+  two `async_fifo` instances (RX and TX) with gray-coded pointers
+  plus `reset_sync` reset synchronisers in each domain
+  (Wave 2 / E-S1-02/03, replaces the earlier "CMAC clk == core
+  clk" stub).
+- `eth_mac_100g_shim` byte-accurate header offsets on both RX and
+  TX — the Wave 2 fix (E-S1-01) closes a 6-byte silent payload
+  loss on the TX first-beat slice.
+- `stub_latency_core` is a simulation-only placeholder; it is
+  gated by a `STUB_ONLY` elaboration check (Wave 3 / WP3.3),
+  kept out of both `fpga/u55c/scripts/build.tcl` and the
+  Verilator lint target in `Makefile`, and raises a
+  `stub_core_detected` tripwire if it ever reaches a bitstream.
+
+What is still a known stub or deferred work (tracked in
+[`docs/INTEGRATION_READINESS.md`](docs/INTEGRATION_READINESS.md)):
+the production low-latency core behind `stub_latency_core`; a
+real multi-in-flight pipeline behind
+`latency_attribution_probe`; an in-fabric BLAKE2b core for the
+audit chain (Option B); and final PCIe / XDMA / HBM2 bring-up
+glue.
+
+## 60-second demo
+
+```bash
+pip install -e ".[all]"
+sentinel-hft deribit demo -o /tmp/sentinel-demo
+sentinel-hft audit verify /tmp/sentinel-demo/audit.aud
+cat /tmp/sentinel-demo/summary.md
+```
+
+A run produces:
+
+| Artifact | What it is |
+|---|---|
+| `traces.sst` | v1.2 binary trace, 64B/record with per-stage attribution |
+| `audit.aud` | Hash-chained audit log, one record per risk-gate decision |
+| `dora.json` | DORA-aligned incident bundle (schema `dora-bundle/1`) |
+| `summary.md` | Human-readable run summary with latency quantiles |
+
+A full walkthrough lives in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
+and the Hyperliquid use-case suite (four operational drills +
+dashboard) is documented in [`docs/USE_CASES.md`](docs/USE_CASES.md).
+The market-fit framing is in
+[`docs/keyrock-2pager.md`](docs/keyrock-2pager.md) and the
+architecture overview (with diagram) is in
+[`docs/architecture.md`](docs/architecture.md). The honest punch
+list of what's in-tree vs. what an integrator still has to add
+before this goes on a real Alveo U55C is in
+[`docs/INTEGRATION_READINESS.md`](docs/INTEGRATION_READINESS.md).
+
+---
+
+## Who is this for
+
+Crypto HFT firms running an FPGA tick-to-trade path that need to
+prove to regulators, auditors, or a risk committee that every order
+passed a deterministic check and that the latency distribution is
+under control. Secondary: MEV searchers and L2 sequencer teams who
+want the same attribution framework for on-chain paths. The features
+below are the detailed reference for each of those audiences.
 
 ---
 

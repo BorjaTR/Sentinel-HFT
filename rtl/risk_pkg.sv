@@ -34,13 +34,26 @@ package risk_pkg;
   } rate_limit_config_t;
 
   // Position limiter config
+  //
+  // NOTE on representation (Wave 1 audit fix A-S0-02 / A-S0-03):
+  //   The position limiter models a signed net position internally. A BUY
+  //   on a short book unwinds that short before it ever contributes to the
+  //   long side; the opposite for SELL on a long book. This removes the
+  //   old "monotonic ratchet" behaviour where gross_notional only ever
+  //   grew and buy-side projection was checked against long cap regardless
+  //   of whether we were flipping a short.
   typedef struct packed {
-    logic [63:0] max_long_qty;      // Max long position (units)
-    logic [63:0] max_short_qty;     // Max short position (units)
-    logic [63:0] max_notional;      // Max notional value
-    logic [63:0] max_order_qty;     // Max single order size
+    logic [63:0] max_long_qty;      // Max long position (units, unsigned)
+    logic [63:0] max_short_qty;     // Max short position (units, unsigned)
+    logic [63:0] max_notional;      // Max gross notional value (unsigned)
+    logic [63:0] max_order_qty;     // Max single order size (unsigned)
     logic        enabled;
   } position_limit_config_t;
+
+  // Signed net position. Positive = long, negative = short.
+  // 65-bit width keeps max_long_qty / max_short_qty (each 64-bit unsigned)
+  // safely representable without overflow on the sign bit.
+  typedef logic signed [64:0] net_position_t;
 
   // Kill switch config
   typedef struct packed {
@@ -66,12 +79,15 @@ package risk_pkg;
   } risk_reject_e;
 
   // Combined risk status
+  //
+  // current_position is signed (positive = long, negative = short) and is
+  // wide enough to hold max_long_qty / max_short_qty without clipping.
   typedef struct packed {
-    logic           passed;         // Order passed all checks
-    risk_reject_e   reject_reason;  // Why it was rejected (if !passed)
-    logic [31:0]    tokens_remaining;
-    logic [63:0]    current_position;
-    logic [63:0]    current_notional;
+    logic            passed;         // Order passed all checks
+    risk_reject_e    reject_reason;  // Why it was rejected (if !passed)
+    logic [31:0]     tokens_remaining;
+    net_position_t   current_position;
+    logic [63:0]     current_notional;
   } risk_status_t;
 
   // =========================================================================

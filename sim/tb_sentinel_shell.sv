@@ -61,6 +61,12 @@ module tb_sentinel_shell
   logic [DATA_WIDTH-1:0]       core_out_data;
   logic                        core_error;
 
+  // WP3.3 tripwire: 1'b1 whenever the stub core lives in the hierarchy.
+  // In this simulation testbench the stub is EXPECTED to be present, so
+  // we sink this into a local observable only. A production top-level
+  // must OR this with similar flags and drive a board LED.
+  logic                        core_stub_detected;
+
   // Trace data (packed struct from shell)
   trace_record_t               trace_data;
 
@@ -110,17 +116,24 @@ module tb_sentinel_shell
   // =========================================================================
   stub_latency_core #(
     .DATA_WIDTH (DATA_WIDTH),
-    .LATENCY    (CORE_LATENCY)
+    .LATENCY    (CORE_LATENCY),
+    // WP3.3: this is a simulation instantiation, so STUB_ONLY stays at
+    // its default (1'b1). A production instantiator would set this to
+    // 1'b0, which triggers the elaboration-time divide-by-zero check
+    // inside stub_latency_core and fails the build.
+    .STUB_ONLY  (1'b1)
   ) u_core (
-    .clk       (clk),
-    .rst_n     (rst_n),
-    .in_valid  (core_in_valid),
-    .in_ready  (core_in_ready),
-    .in_data   (core_in_data),
-    .out_valid (core_out_valid),
-    .out_ready (core_out_ready),
-    .out_data  (core_out_data),
-    .error     (core_error)
+    .clk                (clk),
+    .rst_n              (rst_n),
+    .in_valid           (core_in_valid),
+    .in_ready           (core_in_ready),
+    .in_data            (core_in_data),
+    .out_valid          (core_out_valid),
+    .out_ready          (core_out_ready),
+    .out_data           (core_out_data),
+    .error              (core_error),
+    // WP3.3 bitstream tripwire (see local signal declaration above).
+    .stub_core_detected (core_stub_detected)
   );
 
   // =========================================================================

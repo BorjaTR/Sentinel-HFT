@@ -1,0 +1,105 @@
+flowchart TB
+    classDef done        fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724
+    classDef remaining   fill:#fff3cd,stroke:#f0ad4e,stroke-width:2px,color:#856404
+    classDef pinned      fill:#cce5ff,stroke:#0d6efd,stroke-width:2px,color:#004085
+
+    %% ============================================================
+    %% SHIPPED
+    %% ============================================================
+    subgraph Shipped["SHIPPED (M1-M7, 441 tests passing)"]
+        direction TB
+
+        subgraph M1["M1. Baseline"]
+            M1a[repo audit + plan<br/>docs/IMPLEMENTATION_PLAN.md]
+        end
+
+        subgraph M2["M2. Local-only AI RCA"]
+            M2a[rule-based explainer<br/>sentinel_hft/ai/]
+            M2b[optional local LLM hook<br/>no Anthropic API required]
+        end
+
+        subgraph M3["M3. On-chain attribution"]
+            M3a[Hyperliquid adapter<br/>sentinel_hft/onchain/]
+            M3b[Jito Solana adapter]
+            M3c[same v1.2 trace format]
+        end
+
+        subgraph M4["M4. Tamper-evident audit"]
+            M4a[BLAKE2b chain<br/>rtl/risk_audit_log.sv<br/>sentinel_hft/audit/]
+            M4b[DORA bundle schema<br/>dora-bundle/1]
+            M4c[audit verify CLI]
+        end
+
+        subgraph M5["M5. Deribit LD4 demo"]
+            M5a[6-instrument universe<br/>sentinel_hft/deribit/instruments.py]
+            M5b[seeded tick fixture<br/>fixture.py]
+            M5c[book + spread MM strategy<br/>book.py + strategy.py]
+            M5d[risk gate Python ref<br/>risk.py]
+            M5e[pipeline<br/>pipeline.py]
+            M5f[sentinel-hft deribit demo<br/>20k ticks -> 4 artifacts]
+        end
+
+        subgraph M6["M6. Alveo U55C target"]
+            M6a[top-level wrapper<br/>fpga/u55c/sentinel_u55c_top.sv]
+            M6b[XDC constraints<br/>100MHz clk, SLR0 pblock<br/>fpga/u55c/constraints/sentinel_u55c.xdc]
+            M6c[Vivado batch scripts<br/>build.tcl, elaborate.tcl]
+            M6d[Verilator CI elaborate<br/>.github/workflows/fpga-elaborate.yml]
+            M6e[fpga/u55c/README.md]
+        end
+
+        subgraph M7["M7. Docs + CI hardening"]
+            M7a[top-level README rewrite]
+            M7b[docs/keyrock-2pager.md]
+            M7c[docs/architecture.md<br/>+ Mermaid diagram]
+            M7d[docs/DEMO_SCRIPT.md]
+            M7e[tests/test_e2e_demo.py<br/>11 pinned tests]
+            M7f[CI: integration job runs<br/>deribit demo + audit verify]
+        end
+    end
+
+    %% ============================================================
+    %% REMAINING
+    %% ============================================================
+    subgraph Remaining["REMAINING / FUTURE"]
+        direction TB
+
+        subgraph RFP["FPGA: real-silicon closure"]
+            R1[run full Vivado synth+impl<br/>measure WNS, utilisation, power]
+            R2[generate + program real bitstream]
+            R3[XDMA shell integration<br/>wire prev_hash_lo DMA path]
+            R4[CMAC adapter for QSFP28<br/>100GbE ingress/egress]
+        end
+
+        subgraph RON["On-chain: venue coverage"]
+            R5[Lighter adapter]
+            R6[MegaETH adapter]
+        end
+
+        subgraph RDA["Dashboards"]
+            R7[re-skin Grafana dashboards<br/>around DORA evidence view]
+            R8[live Prometheus metrics for<br/>audit chain / kill switch]
+        end
+
+        subgraph RDO["Polish for Keyrock pitch"]
+            R9[interview deck / slides<br/>optional, only if needed]
+            R10[live demo video capture<br/>optional pre-recorded backup]
+        end
+    end
+
+    %% ============================================================
+    %% KEY STATS + PINS
+    %% ============================================================
+    subgraph Stats["Pinned reference run (seed=1, 5k ticks)"]
+        S1[head_hash_lo<br/>03486379076bf490d53b62ae0bb235c0]
+        S2[p50: 1.34us<br/>p99: 3.23us<br/>p99.9: 7.06us]
+        S3[64% pass rate<br/>chain verified OK]
+    end
+
+    %% Styling
+    class M1,M1a,M2,M2a,M2b,M3,M3a,M3b,M3c,M4,M4a,M4b,M4c done
+    class M5,M5a,M5b,M5c,M5d,M5e,M5f done
+    class M6,M6a,M6b,M6c,M6d,M6e done
+    class M7,M7a,M7b,M7c,M7d,M7e,M7f done
+    class R1,R2,R3,R4,R5,R6,R7,R8,R9,R10 remaining
+    class RFP,RON,RDA,RDO remaining
+    class Stats,S1,S2,S3 pinned

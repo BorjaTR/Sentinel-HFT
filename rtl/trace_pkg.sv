@@ -1,6 +1,28 @@
 `ifndef TRACE_PKG_SV
 `define TRACE_PKG_SV
 
+// =============================================================================
+// trace_pkg -- LEGACY 48-byte trace format
+// -----------------------------------------------------------------------------
+// WAVE 2 AUDIT FIX (B-S1-4): this package is **DEPRECATED**.
+//
+// The v1.2 / 64-byte trace format in `trace_pkg_v12` is the canonical
+// record format for all new work. The two event-level flags that used
+// to live only here --- FLAG_CORE_ERROR and FLAG_INFLIGHT_UNDER ---
+// have been migrated into `trace_pkg_v12::trace_flags_t` as named
+// bits (`d_core_error`, `d_inflight_under`) carved out of the reserved
+// MSB span, so the v1.2 record is a strict superset of v1.1 + these
+// two events.
+//
+// This package is kept only for the legacy `sentinel_shell` module
+// which still emits the 256-bit 32-byte record. Wave 3 (WP3.1) will
+// archive the legacy shell and delete this file.
+//
+// DO NOT add new consumers of this package. Import `trace_pkg_v12`
+// instead.
+// =============================================================================
+
+/* verilator lint_off DECLFILENAME */
 package trace_pkg;
 
   // Configurable parameters (localparams in package, modules can override)
@@ -55,5 +77,6 @@ package trace_pkg;
   localparam int INFLIGHT_ENTRY_WIDTH = $bits(inflight_entry_t); // 176 bits
 
 endpackage
+/* verilator lint_on DECLFILENAME */
 
 `endif

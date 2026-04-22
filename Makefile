@@ -130,6 +130,99 @@ format:
 	-python3 -m ruff check --fix $(HOST_DIR) $(TESTS_DIR) 2>/dev/null || echo "ruff not installed, skipping"
 
 #-------------------------------------------------------------------------------
+# FPGA Targets (Alveo U55C)
+#-------------------------------------------------------------------------------
+
+FPGA_DIR    := fpga/u55c
+FPGA_TOP    := sentinel_u55c_top
+# WP3.1 (2026-04-21): legacy `rtl/trace_pkg.sv` and `rtl/sentinel_shell.sv`
+# are deliberately NOT in this list; v12 is the single production
+# source. WP3.3: `rtl/stub_latency_core.sv` is deliberately absent --
+# its STUB_ONLY elaboration check would fire under Verilator lint.
+# Keep this list in sync with fpga/u55c/scripts/build.tcl and
+# fpga/u55c/scripts/elaborate.tcl.
+FPGA_RTL    := \
+	rtl/trace_pkg_v12.sv \
+	rtl/risk_pkg.sv \
+	rtl/fault_pkg.sv \
+	rtl/eth/eth_pkg.sv \
+	rtl/sync_fifo.sv \
+	rtl/reset_sync.sv \
+	rtl/async_fifo.sv \
+	rtl/stage_timer.sv \
+	rtl/rate_limiter.sv \
+	rtl/position_limiter.sv \
+	rtl/kill_switch.sv \
+	rtl/risk_audit_log.sv \
+	rtl/risk_gate.sv \
+	rtl/instrumented_pipeline.sv \
+	rtl/sentinel_shell_v12.sv \
+	rtl/eth/eth_mac_100g_shim.sv \
+	$(FPGA_DIR)/sentinel_u55c_top.sv
+
+# Elaboration-only check via Verilator --lint-only. Catches most
+# structural bugs (port mismatches, width typos, missing includes)
+# without needing a Vivado install. Used by CI.
+.PHONY: fpga-elaborate
+fpga-elaborate:
+	@echo "=== Elaborating $(FPGA_TOP) with Verilator --lint-only ==="
+	verilator --lint-only -sv \
+	  -Wno-UNUSEDSIGNAL -Wno-UNUSEDPARAM -Wno-UNDRIVEN \
+	  -Wno-WIDTHEXPAND -Wno-WIDTHTRUNC -Wno-WIDTH \
+	  -Wno-PINMISSING -Wno-DECLFILENAME -Wno-CASEINCOMPLETE \
+	  -Irtl -Irtl/eth -I$(FPGA_DIR) \
+	  --top-module $(FPGA_TOP) \
+	  $(FPGA_RTL)
+
+# Full Vivado synth + impl flow. Requires `vivado` on PATH.
+.PHONY: fpga-build
+fpga-build:
+	@echo "=== Running Vivado synth + impl for $(FPGA_TOP) ==="
+	@command -v vivado >/dev/null 2>&1 || { \
+	    echo "ERROR: vivado not on PATH. Install Xilinx Vivado 2023.2+ first."; \
+	    exit 1; }
+	vivado -mode batch -source $(FPGA_DIR)/scripts/build.tcl
+
+# Elaboration-only via Vivado (more thorough than Verilator, but
+# still much faster than a full synth).
+.PHONY: fpga-elaborate-vivado
+fpga-elaborate-vivado:
+	@echo "=== Running Vivado elaboration for $(FPGA_TOP) ==="
+	@command -v vivado >/dev/null 2>&1 || { \
+	    echo "ERROR: vivado not on PATH. Install Xilinx Vivado 2023.2+ first."; \
+	    exit 1; }
+	vivado -mode batch -source $(FPGA_DIR)/scripts/elaborate.tcl
+
+# Open-source synthesis via Yosys. Produces an independent LUT/FF
+# estimate without a Vivado install. Requires Yosys >= 0.40 (the
+# older 0.9 in Ubuntu 22.04 LTS cannot parse SystemVerilog package
+# typedefs). Recommended: yowasp/oss-cad-suite.
+.PHONY: fpga-synth-yosys
+fpga-synth-yosys:
+	@echo "=== Running Yosys synth_xilinx for $(FPGA_TOP) ==="
+	@command -v yosys >/dev/null 2>&1 || { \
+	    echo "ERROR: yosys not on PATH. Install Yosys >= 0.40."; \
+	    exit 1; }
+	yosys -s $(FPGA_DIR)/scripts/yosys_synth.ys \
+	  -l $(FPGA_DIR)/reports/yosys_synth.txt
+
+# First-order area + depth estimate from static RTL parsing. Runs
+# without any FPGA toolchain installed; deterministic and
+# reproducible. Used as a cheap pre-synth sanity check.
+.PHONY: fpga-area-census
+fpga-area-census:
+	@echo "=== First-order area + depth census for $(FPGA_TOP) ==="
+	python3 $(FPGA_DIR)/scripts/area_census.py \
+	  > $(FPGA_DIR)/reports/area_census.txt
+	@tail -20 $(FPGA_DIR)/reports/area_census.txt
+
+.PHONY: fpga-clean
+fpga-clean:
+	@echo "=== Cleaning FPGA build artifacts ==="
+	rm -rf $(FPGA_DIR)/out
+	rm -rf .Xil vivado*.jou vivado*.log
+
+#-------------------------------------------------------------------------------
 # Clean Targets
 #-------------------------------------------------------------------------------
 
@@ -201,6 +294,14 @@ help:
 	@echo "  lint-rtl         Lint RTL only"
 	@echo "  lint-python      Lint Python only"
 	@echo "  format           Format Python code"
+	@echo ""
+	@echo "FPGA targets (Alveo U55C):"
+	@echo "  fpga-elaborate         Verilator --lint-only on $(FPGA_TOP) (CI-friendly)"
+	@echo "  fpga-elaborate-vivado  Vivado elaborate-only flow"
+	@echo "  fpga-build             Full Vivado synth + impl + bitstream"
+	@echo "  fpga-synth-yosys       Open-source synth via Yosys >= 0.40"
+	@echo "  fpga-area-census       First-order area + depth estimate (no toolchain)"
+	@echo "  fpga-clean             Remove fpga/u55c/out + Vivado scratch"
 	@echo ""
 	@echo "Other targets:"
 	@echo "  install          Install package in dev mode"

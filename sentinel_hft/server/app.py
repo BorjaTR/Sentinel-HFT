@@ -5,14 +5,18 @@ Provides HTTP API for trace analysis with streaming upload support.
 """
 
 from fastapi import FastAPI, UploadFile, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from typing import Optional
+import os
 import tempfile
 import shutil
 from pathlib import Path
 
 from sentinel_hft import __version__
 from sentinel_hft.api.server import AnalysisAPI
+from sentinel_hft.server.demo_api import router as demo_router
+from sentinel_hft.server.ai_api import router as ai_router
 
 
 app = FastAPI(
@@ -22,6 +26,29 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# CORS for local dev — the Next.js UI runs on :3000, the FastAPI on
+# :8000. Production deployments should lock this down via the
+# SENTINEL_CORS_ORIGINS env var (comma-separated). Default allows the
+# two common local-dev origins only.
+_cors_origins = os.environ.get(
+    "SENTINEL_CORS_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000,"
+    "http://localhost:5173,http://127.0.0.1:5173",
+).split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _cors_origins if o.strip()],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount the interactive-demo router under /api/*
+app.include_router(demo_router)
+
+# Mount the WS4 (RCA) + WS5 (triage) AI router under /api/ai/*
+app.include_router(ai_router)
 
 api = AnalysisAPI()
 

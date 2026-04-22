@@ -407,8 +407,9 @@ class TestCLIIntegration:
         result = runner.invoke(app, ["demo", "-o", str(tmp_path)])
 
         assert result.exit_code == 0
-        assert (tmp_path / "demo_traces.bin").exists()
-        assert (tmp_path / "demo_report.json").exists()
+        assert (tmp_path / "demo_traces_v11.bin").exists()
+        assert (tmp_path / "demo_traces_v12.bin").exists()
+        assert (tmp_path / "demo_report_v11.json").exists()
 
 
 if __name__ == '__main__':

@@ -211,14 +211,15 @@ class TestDemo:
         result = runner.invoke(app, ["demo", "-o", str(tmp_path)])
 
         assert result.exit_code == 0
-        assert (tmp_path / "demo_traces.bin").exists()
-        assert (tmp_path / "demo_report.json").exists()
+        assert (tmp_path / "demo_traces_v11.bin").exists()
+        assert (tmp_path / "demo_traces_v12.bin").exists()
+        assert (tmp_path / "demo_report_v11.json").exists()
 
     def test_demo_report_valid(self, runner, tmp_path):
         """Demo report is valid JSON."""
         runner.invoke(app, ["demo", "-o", str(tmp_path)])
 
-        report = json.loads((tmp_path / "demo_report.json").read_text())
+        report = json.loads((tmp_path / "demo_report_v11.json").read_text())
 
         assert 'latency' in report
         assert report['latency']['count'] == 10000

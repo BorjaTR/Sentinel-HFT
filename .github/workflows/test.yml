@@ -35,6 +35,8 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Run Python tests
         run: pytest tests/ -v --tb=short --ignore=tests/test_h3_risk_controls.py
+      - name: End-to-end demo regression (head-hash pinned)
+        run: pytest tests/test_e2e_demo.py -v --tb=short
 
   test-rtl:
     runs-on: ubuntu-latest
@@ -80,6 +82,20 @@ jobs:
         run: |
           test -f demo_output/report.json || test -f demo_output/report.md
           test -f demo_output/traces.bin
+      - name: Run Deribit LD4 demo (hero module)
+        run: |
+          sentinel-hft deribit demo \
+            --ticks 5000 --seed 1 \
+            -o deribit_output --quiet
+      - name: Verify Deribit demo artifacts
+        run: |
+          test -f deribit_output/traces.sst
+          test -f deribit_output/audit.aud
+          test -f deribit_output/dora.json
+          test -f deribit_output/summary.md
+      - name: Verify audit chain integrity
+        run: |
+          sentinel-hft audit verify deribit_output/audit.aud
 
   docker:
     runs-on: ubuntu-latest

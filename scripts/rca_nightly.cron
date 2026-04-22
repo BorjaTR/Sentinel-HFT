@@ -1,0 +1,34 @@
+# Sentinel-HFT Workstream 4 -- nightly RCA digest.
+#
+# Install via:
+#   crontab -e
+# and paste one of the lines below.
+#
+# The job runs daily at 05:30 local time, writes the digest to
+# ${SENTINEL_DIGEST_DIR} (default ./out/digests), and archives both
+# the rendered Markdown and the JSON sidecar.
+#
+# Backends (in priority order):
+#   1. Anthropic API  -- export ANTHROPIC_API_KEY before running.
+#   2. Template fallback -- always available; deterministic.
+#
+# Environment:
+#   SENTINEL_HOME         project root (default: $HOME/Sentinel-HFT)
+#   SENTINEL_ARTIFACTS    drill artifacts root (default: out/hl)
+#   SENTINEL_DIGEST_DIR   digest archive (default: out/digests)
+#   ANTHROPIC_API_KEY     optional; template backend if unset.
+#
+# ----------------------------------------------------------------------
+# Production entry (adjust SENTINEL_HOME):
+# 30 5 * * * cd "$HOME/Sentinel-HFT" && \
+#     /usr/bin/env python3 -m sentinel_hft.cli ai rca-nightly \
+#         --artifacts "${SENTINEL_ARTIFACTS:-out/hl}" \
+#         --digest-dir "${SENTINEL_DIGEST_DIR:-out/digests}" \
+#         --backend auto \
+#         --no-print \
+#         >> var/log/rca_nightly.log 2>&1
+#
+# Smoke entry (template backend, no network, useful for dev):
+# */15 * * * * cd "$HOME/Sentinel-HFT" && \
+#     python3 -m sentinel_hft.cli ai rca-nightly \
+#         --backend template --no-print >/dev/null 2>&1

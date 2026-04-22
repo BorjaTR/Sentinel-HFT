@@ -24,6 +24,30 @@ SIM_DIR = PROJECT_ROOT / 'sim'
 RTL_DIR = PROJECT_ROOT / 'rtl'
 
 
+def _verilator_available() -> bool:
+    """Return True if a Verilator toolchain is on PATH."""
+    return shutil.which('verilator') is not None
+
+
+HAS_VERILATOR = _verilator_available()
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip RTL-simulation tests when Verilator is not installed.
+
+    H1 tests (tests/test_h1_*.py) depend on building a Verilator model of
+    the RTL. In environments without the toolchain (CI runners without
+    verilator, laptops, containers), skip rather than fail hard.
+    """
+    if HAS_VERILATOR:
+        return
+    skip_marker = pytest.mark.skip(reason="verilator not installed; RTL simulation tests skipped")
+    for item in items:
+        path = str(item.fspath)
+        if '/test_h1_' in path or path.endswith('test_h3_risk_controls.py'):
+            item.add_marker(skip_marker)
+
+
 @pytest.fixture(scope="session")
 def project_root() -> Path:
     """Return project root path."""

@@ -10,6 +10,7 @@ from typing import Optional, Tuple, Union
 
 from .base import TraceAdapter, StandardTrace
 from .sentinel_adapter import SentinelV10Adapter, SentinelV11Adapter
+from .sentinel_adapter_v12 import SentinelV12Adapter
 from .csv_adapter import CSVAdapter
 
 # Import from formats package
@@ -53,6 +54,9 @@ def auto_detect(path: Union[Path, str]) -> Tuple[TraceAdapter, Optional[FileHead
         elif header.version == 1 and header.record_size == 32:
             # Hypothetical: header with v1.0 records
             return SentinelV10Adapter(), header
+        elif header.version == 2 and header.record_size == 64:
+            # v1.2 format (per-stage attribution deltas)
+            return SentinelV12Adapter(), header
         else:
             raise ValueError(
                 f"Unknown format: version={header.version}, "
@@ -68,9 +72,13 @@ def auto_detect(path: Union[Path, str]) -> Tuple[TraceAdapter, Optional[FileHead
     if file_size > 0 and file_size % 48 == 0:
         return SentinelV11Adapter(), None
 
+    # Could be v1.2 without header (64-byte records)
+    if file_size > 0 and file_size % 64 == 0:
+        return SentinelV12Adapter(), None
+
     raise ValueError(
         f"Cannot detect format for {path}: "
-        f"size {file_size} not divisible by 32 or 48"
+        f"size {file_size} not divisible by 32, 48, or 64"
     )
 
 
@@ -79,6 +87,7 @@ __all__ = [
     'StandardTrace',
     'SentinelV10Adapter',
     'SentinelV11Adapter',
+    'SentinelV12Adapter',
     'CSVAdapter',
     'auto_detect',
 ]

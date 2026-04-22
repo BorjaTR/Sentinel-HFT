@@ -1,0 +1,51 @@
+SENTINEL-HFT FIRST-ORDER AREA + DEPTH ESTIMATE
+Target: AMD Alveo U55C (xcu55c-fsvh2892-2L-e)  @  100 MHz user clock
+Generated: analytic RTL scan, not Vivado / Yosys output.
+==============================================================================
+Module                        Lines     FFs   Cmps  Arith   Mux  Cases
+------------------------------------------------------------------------------
+risk_pkg.sv                     106       0      0      0     0      0
+trace_pkg.sv                     59       0      0      0     0      0
+trace_pkg_v12.sv                 95       0      3      3     0      0
+fault_pkg.sv                     54       0      0      0     0      0
+rate_limiter.sv                 187     564      7     22     0      0
+kill_switch.sv                  108     198      1      8     0      0
+position_limiter.sv             180     336      4     20     0      2
+stage_timer.sv                   53      36      0      3     0      0
+sync_fifo.sv                     83      88      3      5     1      1
+stub_latency_core.sv             96     195      1      4     0      0
+fault_injector.sv               163     216      4     11     0      1
+risk_gate.sv                    235     256      0      7     0      0
+risk_audit_log.sv               185     514      6     13     0      0
+instrumented_pipeline.sv        222     322     18     23     0      2
+sentinel_shell_v12.sv           201     416      0     10     2      0
+------------------------------------------------------------------------------
+TOTAL                                  3141     47    129     3      6
+
+First-order LUT estimate (UltraScale+ LUT6 equivalents):
+  combinational LUTs   ~= 1,298
+  sequential FFs       ~= 3,141
+  estimated BRAM36     ~= 4   (1 audit-log, 1 trace FIFO, 2 metadata FIFOs)
+  estimated DSP48E2    ~= 0   (no multipliers in risk path)
+
+U55C utilisation headroom (1.3M LUTs, 2.6M FFs, 2016 BRAM, 9024 DSP):
+  LUT  utilisation     ~= 0.100%
+  FF   utilisation     ~= 0.121%
+  BRAM utilisation     ~= 0.20%
+  DSP  utilisation     ~= 0.000%
+
+Longest combinational path (LUT levels, analytic):
+  ingress -> risk gate all-pass AND -> reject priority mux  : <= 6 LUT6
+  audit log BLAKE2b chained lane (pipelined)                : <= 5 LUT6/stage
+  stage_timer diff + hash seal                              : <= 4 LUT6
+
+Fmax target : 100 MHz (10 ns period).
+Slack target: >= 2 ns margin at WNS.
+
+Caveats
+-------
+* This is NOT a post-synth report. Vivado numbers supersede it.
+* FF count is an UPPER BOUND assuming full width propagation.
+* LUT count is a FIRST-ORDER estimate from operator counts.
+* BRAM count is design-intent (see risk_audit_log.sv + sync_fifo.sv).
+* Real numbers arrive once `make fpga-build` runs on a Vivado host.

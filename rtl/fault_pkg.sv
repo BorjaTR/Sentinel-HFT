@@ -22,20 +22,26 @@ package fault_pkg;
     } fault_type_t;
 
     // Fault configuration
+    //
+    // NOTE: The field below is named `fault_param`, not `parameter`, because
+    // `parameter` is a reserved word in SystemVerilog-2012/2017 and is rejected
+    // by Verilator >=5.x and modern Vivado. Earlier drafts of this package used
+    // the reserved word, which elaborated under the older Verilator 4.x we were
+    // pinned to but breaks every modern tool.
     typedef struct packed {
         fault_type_t fault_type;       // Type of fault to inject
         logic [31:0] trigger_cycle;    // Cycle to start injection
         logic [31:0] duration_cycles;  // Duration (0 = single shot)
-        logic [31:0] parameter;        // Fault-specific parameter
+        logic [31:0] fault_param;      // Fault-specific parameter
         // Parameters by fault type:
-        //   BACKPRESSURE: parameter = ignored
-        //   FIFO_OVERFLOW: parameter = ignored
-        //   KILL_SWITCH: parameter = ignored
-        //   CORRUPT_DATA: parameter = bit mask
-        //   CLOCK_STRETCH: parameter = max additional cycles
-        //   BURST: parameter = burst size (transactions)
-        //   REORDER: parameter = max displacement
-        //   RESET: parameter = ignored
+        //   BACKPRESSURE:  fault_param = ignored
+        //   FIFO_OVERFLOW: fault_param = ignored
+        //   KILL_SWITCH:   fault_param = ignored
+        //   CORRUPT_DATA:  fault_param = bit mask
+        //   CLOCK_STRETCH: fault_param = max additional cycles
+        //   BURST:         fault_param = burst size (transactions)
+        //   REORDER:       fault_param = max displacement
+        //   RESET:         fault_param = ignored
     } fault_config_t;
 
     // Fault status (output from injector)

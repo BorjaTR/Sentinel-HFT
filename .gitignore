@@ -54,3 +54,9 @@ replay_output/
 # OS
 .DS_Store
 Thumbs.db
+
+# Drill / RCA outputs
+out/
+
+# Drill / RCA outputs
+out/

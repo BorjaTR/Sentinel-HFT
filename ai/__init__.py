@@ -29,6 +29,16 @@ from .explainer import (
     Explainer,
 )
 
+from .backends import (
+    Backend,
+    BackendResponse,
+    BackendUnavailable,
+    DeterministicBackend,
+    OllamaBackend,
+    AnthropicBackend,
+    make_backend,
+)
+
 from .report_generator import (
     AIReport,
     AIReportGenerator,
@@ -48,6 +58,14 @@ __all__ = [
     'ExplanationConfig',
     'Explanation',
     'Explainer',
+    # Backends
+    'Backend',
+    'BackendResponse',
+    'BackendUnavailable',
+    'DeterministicBackend',
+    'OllamaBackend',
+    'AnthropicBackend',
+    'make_backend',
     # Report generation
     'AIReport',
     'AIReportGenerator',

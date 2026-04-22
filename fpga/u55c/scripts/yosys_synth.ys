@@ -1,0 +1,61 @@
+# Yosys synthesis script for Sentinel-HFT risk pipeline.
+#
+# Targets the Xilinx UltraScale+ (xcup) family via the built-in
+# `synth_xilinx` pass. The intent is NOT bitstream generation
+# (Yosys does not drive UltraScale+ place-and-route; that's still
+# Vivado's job). It IS:
+#
+#   * an independent area + logic-depth estimate that does not
+#     require a Vivado install,
+#   * a CI-runnable gate that trips on any non-synthesizable
+#     construct we accidentally introduce,
+#   * a per-module census so we can see which blocks dominate LUT
+#     / FF usage before we commit to a full P&R run.
+#
+# Usage (from repo root):
+#   yosys -s fpga/u55c/scripts/yosys_synth.ys -l fpga/u55c/reports/yosys_synth.txt
+#
+# Yosys 0.9 on Ubuntu 22.04 aarch64 is the validated toolchain.
+
+# --- Front-end ------------------------------------------------------
+# Packages first (define types / constants used by downstream modules).
+read_verilog -sv -defer rtl/risk_pkg.sv
+read_verilog -sv -defer rtl/trace_pkg.sv
+read_verilog -sv -defer rtl/trace_pkg_v12.sv
+read_verilog -sv -defer rtl/fault_pkg.sv
+
+# Leaf risk / instrumentation modules.
+read_verilog -sv -defer rtl/rate_limiter.sv
+read_verilog -sv -defer rtl/kill_switch.sv
+read_verilog -sv -defer rtl/position_limiter.sv
+read_verilog -sv -defer rtl/stage_timer.sv
+read_verilog -sv -defer rtl/risk_gate.sv
+read_verilog -sv -defer rtl/risk_audit_log.sv
+read_verilog -sv -defer rtl/sync_fifo.sv
+read_verilog -sv -defer rtl/stub_latency_core.sv
+read_verilog -sv -defer rtl/fault_injector.sv
+read_verilog -sv -defer rtl/instrumented_pipeline.sv
+
+# Shell (ties instrumentation + FIFO + trace emit together).
+read_verilog -sv -defer rtl/sentinel_shell_v12.sv
+
+# --- Top-level elaboration ------------------------------------------
+hierarchy -check -top sentinel_shell_v12
+
+# --- UltraScale+ technology mapping ---------------------------------
+# synth_xilinx supports UltraScale+ LUT6 / CARRY8 / FDRE mapping.
+# -family xcup targets UltraScale+ (same family as xcu55c).
+# -flatten produces a single flat netlist so the per-module stats
+# below can be computed without hierarchy boundaries confusing the
+# accounting.
+synth_xilinx -family xcup -flatten
+
+# --- Reports --------------------------------------------------------
+# Top-level cell census (LUTs, FFs, CARRY8, BRAM, DSP, LUTRAM).
+tee -o fpga/u55c/reports/yosys_stats_top.txt stat -tech xilinx
+
+# Depth estimate (longest combinational path in LUT levels).
+tee -o fpga/u55c/reports/yosys_longest_path.txt ltp -noff
+
+# Full synthesis info.
+tee -o fpga/u55c/reports/yosys_check.txt check -noinit

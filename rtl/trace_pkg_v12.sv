@@ -24,13 +24,46 @@ package trace_pkg_v12;
         REC_HEARTBEAT   = 8'h04   // Keepalive
     } record_type_t;
 
-    // Flags bitfield (unchanged from v1.1)
+    // Flags bitfield — 16 bits total. Layout from MSB to LSB so that
+    // older parsers reading the same 16-bit word as a raw bitmask see
+    // the v1.1-era bits (valid/fifo_full/backpressure/risk_rejected) in
+    // the same positions; the new sat bits occupy what used to be the
+    // MSB of the reserved span.
+    //
+    // Wave 1 audit fix (C-S0-02):
+    //   - Added d_{ingress,core,risk,egress}_sat sticky bits. Each is
+    //     driven by the corresponding stage_timer saturated output and
+    //     captured into the trace record for the transaction that owns
+    //     the saturating interval. Downstream tooling treats any sat
+    //     bit as "this stage stalled for >= 2^WIDTH cycles, the delta
+    //     field is a clamp, not a measurement".
+    // Wave 2 audit fix (B-S1-4):
+    //   The legacy trace_pkg.sv `trace_flags_e` enum carried two
+    //   event-level flags that have no equivalent in v1.1:
+    //       FLAG_CORE_ERROR      (core raised an error mid-tx)
+    //       FLAG_INFLIGHT_UNDER  (egress saw attr_valid with empty
+    //                             inflight FIFO — shell underflow)
+    //   These are migrated to v1.2 by carving two bits out of the
+    //   MSB-side `reserved` span. Old v1.1 parsers that treat bits
+    //   [15:8] as opaque "reserved, don't interpret" continue to work
+    //   unchanged; v1.2-aware parsers read the new bits by name.
+    //
+    //   Position choice: the core_error / inflight_under bits sit
+    //   immediately above the four sat bits (bits 9:8), so the
+    //   stage-delta bits are still contiguous at [7:4] and the v1.1
+    //   low nibble at [3:0] is untouched.
     typedef struct packed {
-        logic [11:0] reserved;
-        logic        risk_rejected;   // Transaction was rejected by risk gate
-        logic        backpressure;    // Backpressure was active
-        logic        fifo_full;       // Trace FIFO was full
-        logic        valid;           // Record contains valid data
+        logic [5:0]  reserved;         // 6 reserved bits, zero (was 8)
+        logic        d_core_error;     // B-S1-4: core raised error mid-tx
+        logic        d_inflight_under; // B-S1-4: attr_valid with empty inflight FIFO
+        logic        d_ingress_sat;    // Stage timer for ingress saturated (C-S0-02)
+        logic        d_core_sat;       // Stage timer for core saturated
+        logic        d_risk_sat;       // Stage timer for risk saturated
+        logic        d_egress_sat;     // Stage timer for egress saturated
+        logic        risk_rejected;    // Transaction was rejected by risk gate
+        logic        backpressure;     // Backpressure was active
+        logic        fifo_full;        // Trace FIFO was full
+        logic        valid;            // Record contains valid data
     } trace_flags_t;
 
     // v1.1 record (48 bytes) - for reference
@@ -70,15 +103,21 @@ package trace_pkg_v12;
         //       This implicitly captures queueing delays between stages
     } trace_record_v12_t;
 
-    // Compile-time size verification
-    // synthesis translate_off
-    initial begin
-        assert($bits(trace_record_v11_t) == 384)
-            else $error("v1.1 record must be 48 bytes (384 bits)");
-        assert($bits(trace_record_v12_t) == 512)
-            else $error("v1.2 record must be 64 bytes (512 bits)");
-    end
-    // synthesis translate_on
+    // Compile-time size verification.
+    // Wave 0 WP0.1 fix: `initial begin` at package scope is rejected
+    // by Verilator >= 5.x and slang (IEEE 1800-2017 §3.3 does not
+    // permit procedural blocks in packages). The invariant is now a
+    // `localparam` that forces an elaboration-time error if the sizes
+    // ever drift. The `/* verilator lint_off UNUSED */` guards exist
+    // because the parameter may otherwise be reported as unused.
+    /* verilator lint_off UNUSED */
+    localparam int V11_RECORD_BITS = $bits(trace_record_v11_t);
+    localparam int V12_RECORD_BITS = $bits(trace_record_v12_t);
+    // These will fail to elaborate (division-by-zero) if the struct
+    // widths ever drift from 384 and 512 bits respectively.
+    localparam int V11_SIZE_OK = 1 / (V11_RECORD_BITS == 384 ? 1 : 0);
+    localparam int V12_SIZE_OK = 1 / (V12_RECORD_BITS == 512 ? 1 : 0);
+    /* verilator lint_on UNUSED */
 
     // Helper function: compute total latency from deltas
     function automatic logic [31:0] sum_deltas(trace_record_v12_t rec);

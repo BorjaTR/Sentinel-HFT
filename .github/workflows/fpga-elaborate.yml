@@ -1,0 +1,63 @@
+name: FPGA Elaborate (Alveo U55C)
+
+# Runs a Verilator --lint-only pass against the full Alveo U55C
+# top-level. This catches the overwhelming majority of "someone
+# broke the top-level wiring" bugs without requiring Vivado (which
+# is a 40+ GB install and takes minutes to start).
+#
+# The heavier Vivado flow (synth + impl + bitstream) is documented
+# in fpga/u55c/README.md and intended to be run on-demand on a
+# machine that has the licensed toolchain, not on every PR.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'rtl/**'
+      - 'fpga/**'
+      - '.github/workflows/fpga-elaborate.yml'
+      - 'Makefile'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'rtl/**'
+      - 'fpga/**'
+      - '.github/workflows/fpga-elaborate.yml'
+      - 'Makefile'
+  workflow_dispatch:
+
+jobs:
+  fpga-elaborate:
+    runs-on: ubuntu-latest
+    name: Elaborate sentinel_u55c_top
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Verilator
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y verilator
+          verilator --version
+
+      - name: Show pipeline topology
+        run: |
+          echo "=== RTL under elaboration ==="
+          ls rtl/*.sv
+          echo ""
+          echo "=== U55C-specific wrapper ==="
+          ls fpga/u55c/
+          echo ""
+          echo "=== Top module ==="
+          grep -l "module sentinel_u55c_top" fpga/u55c/*.sv
+
+      - name: Run elaboration (Verilator --lint-only)
+        run: make fpga-elaborate
+
+      - name: Upload XDC for artifact browsing
+        uses: actions/upload-artifact@v4
+        with:
+          name: fpga-u55c-constraints
+          path: fpga/u55c/constraints/
+          retention-days: 30

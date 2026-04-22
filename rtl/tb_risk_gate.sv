@@ -129,7 +129,9 @@ module tb_risk_gate
     .fill_qty               (fill_qty),
     .fill_notional          (fill_notional),
 
-    .current_pnl            (current_pnl),
+    // current_pnl is interpreted as signed inside the gate; the tb wire
+    // is unsigned for wire-compat, bits are reinterpreted.
+    .current_pnl            ($signed(current_pnl)),
     .pnl_is_loss            (pnl_is_loss),
 
     .status                 (status),
@@ -146,7 +148,10 @@ module tb_risk_gate
   assign out_reject_reason = reject_reason;
   assign status_passed     = status.passed;
   assign status_tokens     = status.tokens_remaining;
-  assign status_position   = status.current_position;
+  // current_position is signed [64:0] (net_position_t). Truncate to 64 bits
+  // for the legacy testbench surface — C++ harness interprets the result
+  // as a signed 64-bit integer.
+  assign status_position   = status.current_position[63:0];
   assign status_notional   = status.current_notional;
 
 endmodule

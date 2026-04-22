@@ -32,6 +32,7 @@ module tb_latency_attribution;
     logic [6:0]  trace_size;
     logic [31:0] seq_no;
     logic [31:0] drop_count;
+    logic [31:0] inflight_underflow_count_w;
 
     // DUT
     sentinel_shell_v12 #(
@@ -49,12 +50,14 @@ module tb_latency_attribution;
         .dn_valid(dn_valid),
         .dn_ready(dn_ready),
         .dn_data(dn_data),
+        .dn_tlast(),  // tb ignores dn_tlast
         .trace_valid(trace_valid),
         .trace_ready(trace_ready),
         .trace_data(trace_data),
         .trace_size(trace_size),
         .seq_no(seq_no),
-        .trace_drop_count(drop_count)
+        .trace_drop_count(drop_count),
+        .inflight_underflow_count(inflight_underflow_count_w)
     );
 
     // Clock generation
