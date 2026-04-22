@@ -60,3 +60,10 @@ out/
 
 # Drill / RCA outputs
 out/
+
+# Yosys ltp outputs -- 11MB each, dominated by "Detected loop" warnings
+# from flattened ALU feedback paths. Produced on-demand by
+# fpga/u55c/scripts/yosys_ltp_u55c.ys and uploaded as a CI artifact
+# by .github/workflows/synth-yosys.yml. No reason to version them.
+fpga/u55c/reports/yosys_ltp.txt
+fpga/u55c/reports/yosys_ltp.log

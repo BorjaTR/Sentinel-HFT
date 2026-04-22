@@ -1,0 +1,57 @@
+# Yosys longest-topological-path estimate for the Sentinel-HFT U55C top.
+#
+# This is the companion script to yosys_synth_u55c.ys. The main synth
+# script runs `synth_xilinx -family xcup -flatten` and dumps a
+# cell-census + sanity-check report in ~5s, small enough to live
+# inside the GitHub Actions synth-yosys job. The `ltp` pass on a
+# fully flattened synth_xilinx netlist, by contrast, can burn minutes
+# walking a tangle of automatically-inserted ALU feedback paths and
+# floods the log with tens of thousands of "Detected loop" warnings.
+# We keep that analysis in this standalone script so it can be run
+# on-demand locally or from a slower, opt-in CI job.
+#
+# Usage (from repo root):
+#   yosys -s fpga/u55c/scripts/yosys_ltp_u55c.ys \
+#         -l fpga/u55c/reports/yosys_ltp.log
+#
+# Output:
+#   fpga/u55c/reports/yosys_ltp.txt  (human-readable, LUT-levels)
+
+# Front-end identical to yosys_synth_u55c.ys -- slang + single-unit,
+# so the preprocessor guards on the package files work as intended.
+plugin -i slang
+read_slang \
+    --top sentinel_u55c_top \
+    --single-unit \
+    --ignore-unknown-modules \
+    --best-effort-hierarchy \
+    -I rtl \
+    -I rtl/eth \
+    -D SENTINEL_STUB_IBUFDS \
+    rtl/risk_pkg.sv \
+    rtl/trace_pkg.sv \
+    rtl/trace_pkg_v12.sv \
+    rtl/fault_pkg.sv \
+    rtl/eth/eth_pkg.sv \
+    rtl/rate_limiter.sv \
+    rtl/kill_switch.sv \
+    rtl/position_limiter.sv \
+    rtl/stage_timer.sv \
+    rtl/risk_gate.sv \
+    rtl/risk_audit_log.sv \
+    rtl/sync_fifo.sv \
+    rtl/stub_latency_core.sv \
+    rtl/fault_injector.sv \
+    rtl/instrumented_pipeline.sv \
+    rtl/reset_sync.sv \
+    rtl/async_fifo.sv \
+    rtl/eth/eth_mac_100g_shim.sv \
+    rtl/sentinel_shell_v12.sv \
+    fpga/u55c/sentinel_u55c_top.sv
+
+hierarchy -check -top sentinel_u55c_top
+synth_xilinx -family xcup -flatten
+
+tee -a fpga/u55c/reports/yosys_ltp.txt log
+tee -a fpga/u55c/reports/yosys_ltp.txt log === sentinel_u55c_top :: longest combinational path (LUT levels) ===
+tee -a fpga/u55c/reports/yosys_ltp.txt ltp -noff

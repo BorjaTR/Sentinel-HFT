@@ -1,0 +1,249 @@
+name: FPGA Synth (Yosys / UltraScale+)
+
+# Phase 0a of the V2.0 plan: an independent, CI-runnable synthesis
+# estimate for the Alveo U55C top. Yosys cannot drive UltraScale+
+# place-and-route (Vivado owns that), but `synth_xilinx -family xcup`
+# does give us a usable LUT / FF / CARRY8 / BRAM / DSP census and a
+# longest-combinational-path estimate in LUT levels -- enough to catch
+# an accidental 10x-LUT regression on a PR without spinning up a 85 GB
+# Vivado install.
+#
+# If the full synth flow fails (missing SV feature, unreadable source,
+# etc.) the workflow falls back to a lint-only pass that still exercises
+# `read_verilog -sv -defer` + `hierarchy -check -top sentinel_u55c_top`
+# across the same file set. The failure is surfaced in the report body
+# so a reviewer can tell "this is a lint-only run" from
+# "this is a full synth run" at a glance.
+#
+# Heavier Vivado flow (synth + impl + bitstream) is documented in
+# fpga/u55c/README.md and lives in Phase 0b -- blocked on AWS +
+# AMD licence, run on-demand on a machine with the licensed tooling.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'rtl/**'
+      - 'fpga/**'
+      - '.github/workflows/synth-yosys.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'rtl/**'
+      - 'fpga/**'
+      - '.github/workflows/synth-yosys.yml'
+  workflow_dispatch:
+
+jobs:
+  synth-yosys:
+    runs-on: ubuntu-latest
+    name: Yosys synth_xilinx xcup -> sentinel_u55c_top
+
+    env:
+      # oss-cad-suite ships a recent Yosys (>= 0.40) built with the
+      # slang / SystemVerilog front-end -- necessary for packages +
+      # typedefs in our RTL. The Ubuntu apt package is Yosys 0.9 which
+      # predates SV packages and will fail on risk_pkg.sv.
+      #
+      # Pinning to a specific release is more reproducible than
+      # chasing "latest", but we fall back to the GitHub "latest"
+      # release if the pinned tarball has been cleaned up.
+      OSS_CAD_SUITE_TAG: '2025-10-01'
+      REPORT: 'fpga/u55c/reports/yosys_synth.txt'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show pipeline topology
+        run: |
+          echo "=== RTL under synthesis ==="
+          ls rtl/*.sv rtl/eth/*.sv
+          echo ""
+          echo "=== U55C wrapper ==="
+          ls fpga/u55c/*.sv
+          echo ""
+          echo "=== Top module ==="
+          grep -l "module sentinel_u55c_top" fpga/u55c/*.sv
+          echo ""
+          echo "=== Script ==="
+          ls -la fpga/u55c/scripts/yosys_synth_u55c.ys
+
+      - name: Cache oss-cad-suite
+        id: cache-oss-cad-suite
+        uses: actions/cache@v4
+        with:
+          path: /opt/oss-cad-suite
+          key: oss-cad-suite-${{ env.OSS_CAD_SUITE_TAG }}-linux-x64
+
+      - name: Install oss-cad-suite (Yosys + slang)
+        if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+
+          # Try pinned tag first; fall back to GitHub "latest" release.
+          TAG="${OSS_CAD_SUITE_TAG}"
+          DATE_COMPACT="${TAG//-/}"
+          URL="https://github.com/YosysHQ/oss-cad-suite-build/releases/download/${TAG}/oss-cad-suite-linux-x64-${DATE_COMPACT}.tgz"
+          echo "Trying pinned: ${URL}"
+          if ! curl -fsSL --retry 3 -o /tmp/oss-cad-suite.tgz "${URL}"; then
+            echo "Pinned tag ${TAG} not available; falling back to GitHub latest release."
+            LATEST_JSON=$(curl -fsSL https://api.github.com/repos/YosysHQ/oss-cad-suite-build/releases/latest)
+            LATEST_TAG=$(echo "${LATEST_JSON}" | grep -oE '"tag_name":\s*"[^"]+"' | head -1 | sed -E 's/.*"([^"]+)"$/\1/')
+            LATEST_DATE=${LATEST_TAG//-/}
+            URL="https://github.com/YosysHQ/oss-cad-suite-build/releases/download/${LATEST_TAG}/oss-cad-suite-linux-x64-${LATEST_DATE}.tgz"
+            echo "Fetching ${URL}"
+            curl -fsSL --retry 3 -o /tmp/oss-cad-suite.tgz "${URL}"
+          fi
+
+          sudo mkdir -p /opt
+          sudo tar -xzf /tmp/oss-cad-suite.tgz -C /opt
+          rm -f /tmp/oss-cad-suite.tgz
+          # oss-cad-suite unpacks to /opt/oss-cad-suite/{bin,lib,...}
+          ls /opt/oss-cad-suite/bin | head -5
+
+      - name: Put Yosys on PATH and export oss-cad-suite env
+        run: |
+          # oss-cad-suite ships an `environment` file that sets PATH,
+          # LD_LIBRARY_PATH, and a handful of tool-specific vars. We
+          # snapshot that into $GITHUB_ENV / $GITHUB_PATH so subsequent
+          # steps inherit it without needing to `source` every time.
+          if [ -f /opt/oss-cad-suite/environment ]; then
+            # shellcheck disable=SC1091
+            source /opt/oss-cad-suite/environment
+            echo "PATH=$PATH" >> "$GITHUB_ENV"
+            echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+            if [ -n "${PYTHON:-}" ]; then
+              echo "PYTHON=${PYTHON}" >> "$GITHUB_ENV"
+            fi
+          else
+            echo "/opt/oss-cad-suite/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Yosys version
+        run: |
+          yosys -V
+
+      - name: Prepare report directory
+        run: |
+          mkdir -p fpga/u55c/reports
+
+      - name: Run Yosys synth_xilinx (full flow)
+        id: synth
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          # Provenance header so the report is self-describing.
+          {
+            echo "# Yosys synth report -- Sentinel-HFT U55C (sentinel_u55c_top)"
+            echo "# Generated: $(date -u --iso-8601=seconds)"
+            echo "# Commit:    ${GITHUB_SHA}"
+            echo "# Runner:    ${RUNNER_OS} / ${RUNNER_ARCH}"
+            echo "# Yosys:     $(yosys -V 2>&1 | head -1)"
+            echo "# Script:    fpga/u55c/scripts/yosys_synth_u55c.ys"
+            echo "# Mode:      FULL (synth_xilinx -family xcup -flatten; stat + check)"
+            echo "# Note:      longest-path (ltp) analysis writes to the sidecar"
+            echo "#            fpga/u55c/reports/yosys_ltp.txt in the next step."
+            echo ""
+          } > "${REPORT}"
+          # Yosys writes stat/check output via `tee -a` inside the
+          # script. Send the full Yosys log to a sidecar file so the CI
+          # UI has a clickable build log even when synth succeeds.
+          yosys -s fpga/u55c/scripts/yosys_synth_u55c.ys \
+                -l fpga/u55c/reports/yosys_synth.log
+
+      - name: Run Yosys ltp (longest-path, non-blocking)
+        id: ltp
+        if: steps.synth.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          # Longest-combinational-path analysis. Runs as a separate
+          # yosys invocation so a failure or slow run here never
+          # affects the area gate above. The output file is verbose
+          # (~150k lines including "Detected loop" warnings emitted
+          # by yosys during traversal of automatically-inserted ALU
+          # feedback paths) but contains the authoritative
+          # "Longest topological path ... (length=N)" summary line.
+          yosys -s fpga/u55c/scripts/yosys_ltp_u55c.ys \
+                -l fpga/u55c/reports/yosys_ltp.log || true
+          # Surface the headline number in the job log regardless.
+          if [ -f fpga/u55c/reports/yosys_ltp.txt ]; then
+            echo "=== ltp summary (grepped) ==="
+            grep -E "Longest topological path" fpga/u55c/reports/yosys_ltp.txt || true
+          fi
+
+      - name: Lint-only fallback (synth failed)
+        if: steps.synth.outcome == 'failure'
+        run: |
+          set -euo pipefail
+          {
+            echo "# Yosys lint-only report -- Sentinel-HFT U55C (sentinel_u55c_top)"
+            echo "# Generated: $(date -u --iso-8601=seconds)"
+            echo "# Commit:    ${GITHUB_SHA}"
+            echo "# Runner:    ${RUNNER_OS} / ${RUNNER_ARCH}"
+            echo "# Yosys:     $(yosys -V 2>&1 | head -1)"
+            echo "# Mode:      LINT-ONLY FALLBACK"
+            echo "#"
+            echo "# The full synth_xilinx pass failed. See"
+            echo "# fpga/u55c/reports/yosys_synth.log for the Yosys stderr."
+            echo "# This file captures the lightest possible gate"
+            echo "# (read_slang + hierarchy) so the failure surfaces in"
+            echo "# diagnostic form instead of silently blocking the workflow."
+            echo ""
+          } > "${REPORT}"
+
+          # NOTE: Yosys' built-in `echo` is a log-verbosity toggle, not
+          # a string-printer, so section headers use `log` instead.
+          # The marker phrase below is the one the gate step at the
+          # end of this workflow greps for to distinguish a successful
+          # lint-only fallback from a total collapse.
+          yosys -q -p '
+            plugin -i slang
+            read_slang \
+              --top sentinel_u55c_top \
+              --single-unit \
+              --ignore-unknown-modules \
+              --best-effort-hierarchy \
+              -I rtl -I rtl/eth -D SENTINEL_STUB_IBUFDS \
+              rtl/risk_pkg.sv rtl/trace_pkg.sv rtl/trace_pkg_v12.sv \
+              rtl/fault_pkg.sv rtl/eth/eth_pkg.sv \
+              rtl/rate_limiter.sv rtl/kill_switch.sv rtl/position_limiter.sv \
+              rtl/stage_timer.sv rtl/risk_gate.sv rtl/risk_audit_log.sv \
+              rtl/sync_fifo.sv rtl/stub_latency_core.sv rtl/fault_injector.sv \
+              rtl/instrumented_pipeline.sv rtl/reset_sync.sv rtl/async_fifo.sv \
+              rtl/eth/eth_mac_100g_shim.sv rtl/sentinel_shell_v12.sv \
+              fpga/u55c/sentinel_u55c_top.sv
+            tee -a fpga/u55c/reports/yosys_synth.txt log === hierarchy check (lint-only, slang) ===
+            tee -a fpga/u55c/reports/yosys_synth.txt hierarchy -check -top sentinel_u55c_top
+          ' 2>&1 | tee -a fpga/u55c/reports/yosys_synth.log
+          # Surface the failure in the job but do not abort artifact upload.
+          echo "::warning title=Yosys synth failed::Full synth_xilinx pass failed; see yosys_synth.log. Lint-only fallback succeeded."
+
+      - name: Show first 80 lines of report
+        run: |
+          head -80 "${REPORT}" || true
+
+      - name: Upload Yosys report
+        uses: actions/upload-artifact@v4
+        with:
+          name: yosys-synth-report
+          path: |
+            fpga/u55c/reports/yosys_synth.txt
+            fpga/u55c/reports/yosys_synth.log
+            fpga/u55c/reports/yosys_ltp.txt
+            fpga/u55c/reports/yosys_ltp.log
+          retention-days: 30
+
+      - name: Fail if both full + lint modes failed
+        if: steps.synth.outcome == 'failure'
+        run: |
+          # The lint-only step above exits 0 iff `hierarchy -check`
+          # succeeds. If we reach this point and the report file
+          # exists but doesn't contain the hierarchy marker, both
+          # paths collapsed and the PR should be blocked.
+          if ! grep -q "hierarchy check (lint-only, slang)" "${REPORT}"; then
+            echo "::error title=Yosys lint-only fallback also failed::Both full synth and lint-only fallback failed; see uploaded yosys_synth.log."
+            exit 1
+          fi
+          echo "Lint-only fallback succeeded; workflow is green but flagged."

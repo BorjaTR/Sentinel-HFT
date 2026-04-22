@@ -6,10 +6,29 @@ produces. Today the repo carries:
 | File                 | Source tool                | Status |
 |----------------------|----------------------------|--------|
 | `area_census.txt`    | `scripts/area_census.py`   | present (analytic, reproducible) |
-| `yosys_synth.txt`    | `yosys -s scripts/yosys_synth.ys` | populated on any host with Yosys ≥ 0.40 or oss-cad-suite |
+| `yosys_synth.txt`    | `yosys -s scripts/yosys_synth_u55c.ys` (V2 Phase 0a, full U55C top) | populated on any host with Yosys ≥ 0.40 or oss-cad-suite, **and by `.github/workflows/synth-yosys.yml` on every PR** as a build artifact |
+| `yosys_synth.log`    | `yosys -l` sidecar         | uploaded alongside the report; contains the full Yosys stderr for debugging |
 | `vivado_utilization.rpt` | Vivado `report_utilization` | populated by `make fpga-build` |
 | `vivado_timing.rpt`  | Vivado `report_timing_summary` | populated by `make fpga-build` |
 | `vivado_power.rpt`   | Vivado `report_power`       | populated by `make fpga-build` |
+
+Three Yosys scripts live in `../scripts/`:
+
+* `yosys_synth.ys` — targets `sentinel_shell_v12` (the instrumentation
+  shell alone). Faster, useful for isolating shell-level regressions.
+  Historical; pre-V2 entry point.
+* `yosys_synth_u55c.ys` — targets `sentinel_u55c_top` (the full U55C
+  wrapper, including CMAC CDC plumbing, risk gate, audit log, MMCM
+  stub, LEDs, heartbeat). This is the V2.0 Phase 0a CI gate and the
+  one the GitHub Actions workflow runs. Does synth + stat + check
+  and produces `yosys_synth.txt` in ~5 s on an Apple-silicon host.
+* `yosys_ltp_u55c.ys` — same front-end and same synth pass, but the
+  only report it emits is `ltp -noff` (longest combinational path
+  in LUT levels) into `yosys_ltp.txt`. Split out of the main script
+  because on a fully-flattened synth_xilinx netlist `ltp` walks every
+  automatically-inserted ALU feedback path and floods the log with
+  tens of thousands of "Detected loop" warnings — fine locally or in
+  a slower opt-in CI job, too heavy for the main 1-minute CI step.
 
 ## What's actually here today
 
@@ -46,17 +65,30 @@ FF budget** — there is no area risk, the bottleneck during bring-up will
 be timing closure on the audit-log BLAKE2b lane and the order parser,
 not area.
 
-## Why there's no `yosys_synth.txt` yet
+## Where `yosys_synth.txt` comes from
 
-The repo carries a working `scripts/yosys_synth.ys` script. It runs
-against the full RTL tree on any host with **Yosys ≥ 0.40** (for
-SystemVerilog package + typedef support) or an **oss-cad-suite** build
-(Yosys + slang front-end + Verilator pre-bundled). The CI sandbox used
-to author this repo shipped Yosys 0.9, which predates SV-package
-support, and the aarch64 oss-cad-suite tarball (~400 MB) did not fit
-the remaining disk budget at the time the estimate was committed. The
-report will appear here automatically the first time the script is run
-on a host with the right toolchain.
+The repo carries two Yosys scripts:
+
+* `scripts/yosys_synth.ys` (shell-only, historical) and
+* `scripts/yosys_synth_u55c.ys` (full U55C top, V2.0 Phase 0a).
+
+Both run on any host with **Yosys ≥ 0.40** (for SystemVerilog package
++ typedef support) or an **oss-cad-suite** build (Yosys + slang
+front-end + Verilator pre-bundled). The CI sandbox used to author
+this repo originally shipped Yosys 0.9, which predates SV-package
+support, so the first committed `yosys_synth.txt` comes from the
+GitHub Actions workflow `.github/workflows/synth-yosys.yml` — it
+downloads a recent oss-cad-suite release on `ubuntu-latest` and
+uploads the resulting report as a build artifact. Re-running the
+script locally on a host with the right toolchain produces
+bit-identical output for an unchanged tree.
+
+If the full `synth_xilinx -family xcup -flatten` pass fails (bad SV
+feature, read error, etc.), the workflow falls back to a lint-only
+`read_verilog -sv -defer ...; hierarchy -check -top sentinel_u55c_top`
+pass and writes a clearly-marked "LINT-ONLY FALLBACK" banner into the
+report, so a reviewer can tell a full-synth run from a lint-only run
+at a glance.
 
 ## Why there's no Vivado reports yet
 

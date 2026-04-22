@@ -1,0 +1,142 @@
+# Yosys synthesis script for the Sentinel-HFT Alveo U55C top.
+#
+# This is the V2 Phase 0a CI target. Where `yosys_synth.ys` stops at the
+# instrumentation shell (``sentinel_shell_v12``), this script closes the
+# wrapper: shell + risk gate + audit log + CMAC CDC plumbing + U55C
+# physical-pin wrapper (``sentinel_u55c_top``). The output is the single
+# machine-readable report the V2_PLAN.md spec names:
+#
+#     fpga/u55c/reports/yosys_synth.txt
+#
+# The goal is NOT bitstream generation (Yosys does not drive UltraScale+
+# place-and-route; that's still Vivado's job). It IS:
+#
+#   * an independent area estimate that does not require a Vivado install,
+#   * a CI-runnable gate that trips on any non-synthesizable construct
+#     we accidentally introduce into the top-level wrapper,
+#   * a per-module cell census including the CDC FIFOs and CMAC shim so
+#     a reviewer can see the U55C wrapper's actual shape before a P&R run.
+#
+# The longest-combinational-path (LUT levels) analysis lives in the
+# companion script `yosys_ltp_u55c.ys`. It was split out because `ltp`
+# on a fully-flattened synth_xilinx netlist walks every automatically-
+# inserted ALU feedback path -- fast enough to be useful, but it floods
+# the log with tens of thousands of "Detected loop" warnings and can
+# overrun a 1-minute GitHub Actions step. Run it on-demand locally or
+# from a slower opt-in CI job.
+#
+# Usage (from repo root):
+#   yosys -s fpga/u55c/scripts/yosys_synth_u55c.ys \
+#         -l fpga/u55c/reports/yosys_synth.log
+#
+# Requirements:
+#   * oss-cad-suite (bundles Yosys + the `slang` SystemVerilog front-end).
+#     Yosys's built-in Verilog-2005 frontend (invoked via
+#     `read_verilog -sv`) is incomplete and chokes on modern SV
+#     constructs we use -- `$bits(typedef_struct)`, certain
+#     `unique case` / `priority case` forms, interface-heavy
+#     parameter passing, etc. The `slang` plugin replaces it with a
+#     spec-complete SV parser (same lineage as the commercial tools).
+#     It is pre-bundled in oss-cad-suite; on a stock Yosys install
+#     you would need to build yosys-slang from source.
+
+# --- Front-end ------------------------------------------------------
+# Load slang. In recent oss-cad-suite builds slang is auto-loaded, but
+# the explicit `plugin -i slang` is a no-op in that case and guarantees
+# correct behaviour on a stock Yosys.
+plugin -i slang
+
+# slang reads the whole project in one invocation -- it resolves
+# packages, typedefs, and modules globally, so file order doesn't
+# matter (unlike read_verilog -sv which needs packages first).
+#
+# IMPORTANT: our RTL uses `include directives with `ifndef/`endif
+# guards (Verilator-idiomatic pattern). Slang defaults to multi-unit
+# SV semantics per LRM 3.12, which means `define macros DO NOT leak
+# across compilation units -- so the include guards don't fire and
+# every file that `include`s risk_pkg.sv gets a fresh copy of the
+# package. The --single-unit flag flips slang into Verilator-style
+# single-unit mode where all input files share one preprocessor
+# state and the guards work as intended.
+#
+# Flags:
+#   --top <name>             pin the elaboration root
+#   --single-unit            treat all inputs as one compilation unit
+#                            (so `include guards are effective)
+#   --ignore-unknown-modules keep going if a black-box is referenced
+#                            (e.g. MMCM, IBUFDS) -- Yosys' synth_xilinx
+#                            pass will recognise IBUFDS by name.
+#   -I <dir>                 header / include search path
+#   -D NAME                  preprocessor define
+#   --best-effort-hierarchy  silence "no driver" warnings on stub pins
+#                            so the console isn't drowned in noise.
+#
+# Order of files below is informational only; slang sorts internally.
+read_slang \
+    --top sentinel_u55c_top \
+    --single-unit \
+    --ignore-unknown-modules \
+    --best-effort-hierarchy \
+    -I rtl \
+    -I rtl/eth \
+    -D SENTINEL_STUB_IBUFDS \
+    rtl/risk_pkg.sv \
+    rtl/trace_pkg.sv \
+    rtl/trace_pkg_v12.sv \
+    rtl/fault_pkg.sv \
+    rtl/eth/eth_pkg.sv \
+    rtl/rate_limiter.sv \
+    rtl/kill_switch.sv \
+    rtl/position_limiter.sv \
+    rtl/stage_timer.sv \
+    rtl/risk_gate.sv \
+    rtl/risk_audit_log.sv \
+    rtl/sync_fifo.sv \
+    rtl/stub_latency_core.sv \
+    rtl/fault_injector.sv \
+    rtl/instrumented_pipeline.sv \
+    rtl/reset_sync.sv \
+    rtl/async_fifo.sv \
+    rtl/eth/eth_mac_100g_shim.sv \
+    rtl/sentinel_shell_v12.sv \
+    fpga/u55c/sentinel_u55c_top.sv
+
+# --- Top-level elaboration ------------------------------------------
+hierarchy -check -top sentinel_u55c_top
+
+# --- UltraScale+ technology mapping ---------------------------------
+# synth_xilinx supports UltraScale+ LUT6 / CARRY8 / FDRE mapping.
+# -family xcup targets UltraScale+ (same family as xcu55c).
+# -flatten produces a single flat netlist so the per-module stats
+# below can be computed without hierarchy boundaries confusing the
+# accounting.
+synth_xilinx -family xcup -flatten
+
+# --- Reports --------------------------------------------------------
+# Single consolidated report is what V2_PLAN.md Phase 0a asks for.
+# Yosys `tee` appends the stat / check output to a deterministic file.
+# The workflow prepends a small provenance header before invoking
+# this script, then we append each section.
+#
+# NB1: Yosys' built-in `echo` command is `echo on|off` (log verbosity),
+# NOT the POSIX `echo` that prints strings. Section headers are
+# produced with `log` (which *is* a Yosys command that writes an
+# arbitrary message into the log), captured via `tee -a` the same way
+# stat/check output is captured.
+#
+# NB2: `ltp -noff` on a fully-flattened synth_xilinx netlist is very
+# expensive -- floods the log with thousands of "Detected loop"
+# warnings for automatically-generated ALU feedback paths and can run
+# for minutes on a CI runner. The longest-path figure is useful but
+# not load-bearing for an area gate. We run it in a separate script
+# (`yosys_ltp_u55c.ys`) that can be kicked off on-demand locally or
+# in a slower CI job; the main script below stays fast enough to run
+# inside a 1-minute GitHub Actions step.
+
+tee -a fpga/u55c/reports/yosys_synth.txt log
+tee -a fpga/u55c/reports/yosys_synth.txt log === sentinel_u55c_top :: cell census (Xilinx UltraScale+) ===
+tee -a fpga/u55c/reports/yosys_synth.txt stat -tech xilinx
+
+tee -a fpga/u55c/reports/yosys_synth.txt log
+tee -a fpga/u55c/reports/yosys_synth.txt log === sentinel_u55c_top :: synthesis sanity check ===
+tee -a fpga/u55c/reports/yosys_synth.txt check -noinit

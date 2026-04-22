@@ -1,0 +1,214 @@
+
+=== sentinel_u55c_top :: cell census (Xilinx UltraScale+) ===
+
+4. Printing statistics.
+
+=== IBUFDS$sentinel_u55c_top.u_ibufds_sysclk ===
+
+        +----------Local Count, excluding submodules.
+        | 
+        3 wires
+        3 wire bits
+        3 public wires
+        3 public wire bits
+        3 ports
+        3 port bits
+        1 cells
+        1   LUT2
+
+   Estimated number of LCs:          1
+
+=== sentinel_u55c_top ===
+
+        +----------Local Count, excluding submodules.
+        | 
+     3093 wires
+    27814 wire bits
+      357 public wires
+    16574 public wire bits
+       54 ports
+     3081 port bits
+     8293 cells
+       14   $scopeinfo
+        1   BUFG
+      349   CARRY4
+      872   FDCE
+        2   FDPE
+        1   FDRE
+     1198   IBUF
+     1328   INV
+       32   LUT1
+      427   LUT2
+      747   LUT3
+      178   LUT4
+      226   LUT5
+      635   LUT6
+       83   MUXF7
+       12   MUXF8
+        3   MUXF9
+     1883   OBUF
+        6   RAM32M16
+      296   RAM64M8
+        1 submodules
+        1   IBUFDS$sentinel_u55c_top.u_ibufds_sysclk
+
+   Estimated number of LCs:       1786
+
+=== design hierarchy ===
+
+        +----------Count including submodules.
+        | 
+     8294 sentinel_u55c_top
+        1 IBUFDS$sentinel_u55c_top.u_ibufds_sysclk
+
+        +----------Count including submodules.
+        | 
+     3096 wires
+    27817 wire bits
+      360 public wires
+    16577 public wire bits
+       57 ports
+     3084 port bits
+        - memories
+        - memory bits
+        - processes
+     8294 cells
+       14   $scopeinfo
+        1   BUFG
+      349   CARRY4
+      872   FDCE
+        2   FDPE
+        1   FDRE
+     1198   IBUF
+     1328   INV
+       32   LUT1
+      428   LUT2
+      747   LUT3
+      178   LUT4
+      226   LUT5
+      635   LUT6
+       83   MUXF7
+       12   MUXF8
+        3   MUXF9
+     1883   OBUF
+        6   RAM32M16
+      296   RAM64M8
+        1 submodules
+        1   IBUFDS$sentinel_u55c_top.u_ibufds_sysclk
+
+   Estimated number of LCs:       1786
+
+
+=== sentinel_u55c_top :: synthesis sanity check ===
+
+5. Executing CHECK pass (checking for obvious problems).
+Checking module IBUFDS$sentinel_u55c_top.u_ibufds_sysclk...
+Checking module sentinel_u55c_top...
+Found and reported 0 problems.
+
+=== sentinel_u55c_top :: cell census (Xilinx UltraScale+) ===
+
+4. Printing statistics.
+
+=== IBUFDS$sentinel_u55c_top.u_ibufds_sysclk ===
+
+        +----------Local Count, excluding submodules.
+        | 
+        3 wires
+        3 wire bits
+        3 public wires
+        3 public wire bits
+        3 ports
+        3 port bits
+        1 cells
+        1   LUT2
+
+   Estimated number of LCs:          1
+
+=== sentinel_u55c_top ===
+
+        +----------Local Count, excluding submodules.
+        | 
+     3093 wires
+    27814 wire bits
+      357 public wires
+    16574 public wire bits
+       54 ports
+     3081 port bits
+     8293 cells
+       14   $scopeinfo
+        1   BUFG
+      349   CARRY4
+      872   FDCE
+        2   FDPE
+        1   FDRE
+     1198   IBUF
+     1328   INV
+       32   LUT1
+      427   LUT2
+      747   LUT3
+      178   LUT4
+      226   LUT5
+      635   LUT6
+       83   MUXF7
+       12   MUXF8
+        3   MUXF9
+     1883   OBUF
+        6   RAM32M16
+      296   RAM64M8
+        1 submodules
+        1   IBUFDS$sentinel_u55c_top.u_ibufds_sysclk
+
+   Estimated number of LCs:       1786
+
+=== design hierarchy ===
+
+        +----------Count including submodules.
+        | 
+     8294 sentinel_u55c_top
+        1 IBUFDS$sentinel_u55c_top.u_ibufds_sysclk
+
+        +----------Count including submodules.
+        | 
+     3096 wires
+    27817 wire bits
+      360 public wires
+    16577 public wire bits
+       57 ports
+     3084 port bits
+        - memories
+        - memory bits
+        - processes
+     8294 cells
+       14   $scopeinfo
+        1   BUFG
+      349   CARRY4
+      872   FDCE
+        2   FDPE
+        1   FDRE
+     1198   IBUF
+     1328   INV
+       32   LUT1
+      428   LUT2
+      747   LUT3
+      178   LUT4
+      226   LUT5
+      635   LUT6
+       83   MUXF7
+       12   MUXF8
+        3   MUXF9
+     1883   OBUF
+        6   RAM32M16
+      296   RAM64M8
+        1 submodules
+        1   IBUFDS$sentinel_u55c_top.u_ibufds_sysclk
+
+   Estimated number of LCs:       1786
+
+
+=== sentinel_u55c_top :: synthesis sanity check ===
+
+5. Executing CHECK pass (checking for obvious problems).
+Checking module IBUFDS$sentinel_u55c_top.u_ibufds_sysclk...
+Checking module sentinel_u55c_top...
+Found and reported 0 problems.
