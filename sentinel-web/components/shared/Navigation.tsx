@@ -8,7 +8,6 @@ import { Menu, X, Github, LayoutDashboard } from "lucide-react";
 import { Logo } from "./Logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { AuthButtons } from "./AuthButtons";
 import { useAuth } from "@/hooks/useAuth";
 
 // Top-bar navigation — Sentinel-HFT v2.0 surface. The legacy SaaS routes
@@ -114,8 +113,6 @@ export function Navigation() {
                 <span>GitHub</span>
               </a>
             </Button>
-
-            <AuthButtons size="sm" />
           </div>
         </div>
 
@@ -180,8 +177,6 @@ export function Navigation() {
                       <span>GitHub</span>
                     </a>
                   </Button>
-
-                  <AuthButtons size="lg" onNavigate={() => setIsOpen(false)} />
                 </div>
               </div>
             </motion.div>
