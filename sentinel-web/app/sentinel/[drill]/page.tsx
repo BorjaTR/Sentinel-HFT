@@ -14,6 +14,10 @@ import {
   getDrillCatalog,
   streamDrill,
 } from "@/lib/sentinel-api";
+import {
+  DrillStressPanel,
+  type StressOverrides,
+} from "@/components/sentinel/DrillStressPanel";
 import type {
   ComplianceSnapshot,
   DrillCatalog,
@@ -71,6 +75,51 @@ const PRESETS: Record<DrillKind, Preset[]> = {
   ],
 };
 
+// Plain-English "what am I looking at" strip rendered above every
+// drill. Three columns: what the desk feeds in, what to watch while
+// it runs, what the user walks away with. Deliberately free of
+// jargon -- this is the only explanation a business reader needs.
+interface IoStrip {
+  input: string;
+  watch: string;
+  keep: string;
+}
+
+const IO_STRIP: Record<DrillKind, IoStrip> = {
+  toxic_flow: {
+    input:
+      "30,000 orders from a simulated trading day. About half come from counterparties who would have picked you off.",
+    watch:
+      "The rejection counter climb in real time as the system refuses those orders \u2014 in microseconds, before the loss would land.",
+    keep:
+      "A signed report with loss avoided, who got refused, and which rule caught them. Ready to hand to risk or compliance.",
+  },
+  kill_drill: {
+    input:
+      "24,000 orders on a normal morning, then a volatility spike fires at 14:03:27 \u2014 the kind that precedes a flash crash.",
+    watch:
+      "The emergency stop latch at the exact moment the spike hits, and every order after that get refused automatically until a human clears it.",
+    keep:
+      "A sealed record of when the stop engaged, which orders it blocked, and how long until the desk was safe. Regulator-grade.",
+  },
+  latency: {
+    input:
+      "40,000 orders run clean with a stopwatch attached to every stage of the hardware \u2014 market data in, decision, risk check, order out.",
+    watch:
+      "A live chart showing typical time, worst-case time, and anything slower than the promised service level flagged red.",
+    keep:
+      "A per-stage timing table and the single worst trade of the day broken down stage-by-stage. The exact answer to \u201cwhere did the time go?\u201d",
+  },
+  daily_evidence: {
+    input:
+      "A full simulated trading day \u2014 morning open, midday, and close \u2014 the way the regulator would reconstruct it.",
+    watch:
+      "The packet assemble itself: every decision, every rejection, every timing measurement, all sealed so it can\u2019t be quietly edited later.",
+    keep:
+      "One downloadable zip the regulator can verify without trusting us. Pre-mapped to MiFID II, CFTC Reg AT, and FINMA clauses.",
+  },
+};
+
 function ChartSkeleton() {
   return (
     <div className="flex h-48 animate-pulse items-center justify-center rounded border border-[#1a232e] bg-[#0a0e14] font-mono text-xs text-[#4d617a]">
@@ -101,6 +150,10 @@ export default function DrillRunnerPage() {
   );
   const [error, setError] = useState<string | null>(null);
   const [p99History, setP99History] = useState<Array<[number, number]>>([]);
+  const [stress, setStress] = useState<StressOverrides>({
+    pcap: "",
+    chaos: { reorder_pct: 0, drop_pct: 0, lag_us: 0 },
+  });
   const streamRef = useRef<ReturnType<typeof streamDrill> | null>(null);
 
   useEffect(() => {
@@ -131,6 +184,13 @@ export default function DrillRunnerPage() {
     setRunning(true);
     const overrides: Record<string, unknown> = {};
     if (ticks != null && kind !== "daily_evidence") overrides.ticks = ticks;
+    // Stress + replay overrides — pcap path triggers a deterministic
+    // replay on the backend (and flips the ProvenancePill to REPLAY via
+    // lib/sentinel-api.ts), chaos knobs degrade the input wire-side
+    // before the parser timestamp so per-stage attribution still adds
+    // up under reorder / drop / lag.
+    if (stress.pcap.trim().length > 0) overrides.pcap = stress.pcap.trim();
+    overrides.chaos = stress.chaos;
 
     const handle = streamDrill(kind, overrides, {
       onEvent: (ev) => {
@@ -220,6 +280,36 @@ export default function DrillRunnerPage() {
         </div>
       </header>
 
+      {/* Plain-English I/O strip -- the three-line "what am I
+          looking at" answer for a business reader, before any
+          controls or charts appear. */}
+      <section className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="rounded-md border border-[#1a232e] bg-[#0f151d] p-4">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-emerald-400">
+            What we feed in
+          </div>
+          <p className="text-xs leading-relaxed text-[#9ab3c8]">
+            {IO_STRIP[kind].input}
+          </p>
+        </div>
+        <div className="rounded-md border border-[#1a232e] bg-[#0f151d] p-4">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-sky-400">
+            What to watch
+          </div>
+          <p className="text-xs leading-relaxed text-[#9ab3c8]">
+            {IO_STRIP[kind].watch}
+          </p>
+        </div>
+        <div className="rounded-md border border-[#1a232e] bg-[#0f151d] p-4">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-amber-400">
+            What you keep
+          </div>
+          <p className="text-xs leading-relaxed text-[#9ab3c8]">
+            {IO_STRIP[kind].keep}
+          </p>
+        </div>
+      </section>
+
       {/* Preset chips */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="font-mono text-[10px] uppercase tracking-wider text-[#4d617a]">
@@ -281,6 +371,11 @@ export default function DrillRunnerPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Stress + replay panel — pcap path + chaos knobs. Provenance
+          flip and chaos badging happen automatically; the panel just
+          mirrors its state into ``stress`` for the next start(). */}
+      <DrillStressPanel disabled={running} onChange={setStress} />
 
       {error && (
         <div className="mb-4 rounded border border-rose-900/60 bg-rose-950/40 p-3 font-mono text-xs text-rose-200">

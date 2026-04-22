@@ -9,27 +9,36 @@ import type { DrillCatalog, DrillKind } from "@/lib/sentinel-types";
 const DRILL_META: Record<DrillKind, {
   icon: typeof Shield;
   accent: string;
+  title: string;
   story: string;
 }> = {
   toxic_flow: {
     icon: Shield,
     accent: "from-rose-500/20 to-rose-500/5",
-    story: "16 takers · 45% toxic mix · pre-gate guard rejects before risk check",
+    title: "The sharp counterparty",
+    story:
+      "A fund quietly starts picking off your best market-makers. Can you say \u201cno\u201d before the loss lands? 30,000 orders, nearly half from informed counterparties \u2014 watch the system refuse them in microseconds.",
   },
   kill_drill: {
     icon: Zap,
     accent: "from-amber-500/20 to-amber-500/5",
-    story: "Vol spike tick 9k · kill latches at intent 25.5k · every subsequent intent = KILL_SWITCH",
+    title: "The flash crash",
+    story:
+      "The market tears itself apart at 14:03:27. Does your desk keep trading, or does it stop? 24,000 orders run clean, then a volatility spike fires \u2014 watch the emergency stop latch and every subsequent order get blocked automatically.",
   },
   latency: {
     icon: Activity,
     accent: "from-emerald-500/20 to-emerald-500/5",
-    story: "Clean 40k-tick baseline · per-stage p50/p99/p999 · SLO violation counter",
+    title: "The slow leg",
+    story:
+      "You promise clients sub-microsecond decisions. On the worst trade of the day, where did the time actually go? 40,000 orders stopwatched at every stage \u2014 typical time, worst case, and anything slower than the SLA flagged red.",
   },
   daily_evidence: {
     icon: FileCheck,
     accent: "from-sky-500/20 to-sky-500/5",
-    story: "morning / midday / eod · three chains · combined DORA bundle",
+    title: "The Friday afternoon regulator call",
+    story:
+      "The regulator phones at 16:00 and wants proof, today, that nothing was mistraded. A full simulated trading day \u2014 morning, midday, close \u2014 assembles the exact packet MiFID II, CFTC Reg AT and FINMA ask for, sealed so they can verify it without trusting us.",
   },
 };
 
@@ -48,14 +57,17 @@ export default function SentinelOverviewPage() {
           Sentinel-HFT · Interactive demo
         </h1>
         <h2 className="mt-2 text-3xl font-semibold text-[#e4edf5]">
-          Tick-to-trade observability, risk controls, and tamper-evident audit
+          Four scenarios. Each one a bad day for a trading desk.
         </h2>
         <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[#9ab3c8]">
-          Four end-to-end drills replay a Hyperliquid tick stream through the
-          real book &rarr; strategy &rarr; risk-gate &rarr; audit-log pipeline.
-          Each drill emits a JSON + Markdown + HTML report plus a
-          verifiable <span className="font-mono text-[#e4edf5]">.aud</span> chain.
-          Pick a drill to run it live against your local backend.
+          Every trading firm fears the same four things: getting quietly
+          picked off by smarter counterparties, losing millions in the
+          first ten seconds of a market crash, being slower than the
+          competition without knowing it, and missing the regulator's
+          paperwork deadline. This demo reproduces each of those four
+          days &mdash; live, on the same hardware the desk runs &mdash;
+          and shows how the system catches it, stops it, and documents
+          it. Pick a scenario. Each one takes under a minute.
         </p>
       </header>
 
@@ -92,13 +104,18 @@ export default function SentinelOverviewPage() {
                     {kind}
                   </div>
                   <h3 className="text-lg font-semibold text-[#e4edf5]">
-                    {meta?.name ?? "\u00A0"}
+                    {DRILL_META[kind].title}
                   </h3>
+                  {meta?.name && (
+                    <div className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-[#4d617a]">
+                      {meta.name}
+                    </div>
+                  )}
                   <p className="mt-2 text-xs text-[#9ab3c8]">{story}</p>
                   {meta && (
                     <div className="mt-4 flex items-center gap-4 font-mono text-[10px] text-[#6b8196]">
-                      <span>~{meta.expected_duration_s}s run</span>
-                      <span>default {meta.default_ticks.toLocaleString()} ticks</span>
+                      <span>~{meta.expected_duration_s}s to run</span>
+                      <span>{meta.default_ticks.toLocaleString()} orders replayed</span>
                     </div>
                   )}
                 </div>
@@ -116,16 +133,17 @@ export default function SentinelOverviewPage() {
         >
           <div className="mb-2 inline-flex items-center gap-2 rounded border border-[#1f2a38] bg-[#0a0e14] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-[#6b8196]">
             <FileCheck className="h-3 w-3 text-emerald-400" />
-            verifier
+            tamper test
           </div>
           <h3 className="text-lg font-semibold text-[#e4edf5]">
-            Audit-chain verifier
+            Don&rsquo;t trust the log. Try to break it.
           </h3>
           <p className="mt-2 text-xs text-[#9ab3c8]">
-            Upload any <span className="font-mono">.aud</span> file, walk the
-            BLAKE2b-chained sequence, flip a byte on demand to prove
-            tamper detection. The host verifier is the ground truth the
-            RTL claims match.
+            Load one of today&rsquo;s sealed records, change any single
+            byte, and watch the seal break &mdash; the checker points at
+            the exact record that was touched. The math is public, the
+            same kind used by Bitcoin, and you don&rsquo;t have to trust
+            us to run it.
           </p>
         </Link>
         <Link
@@ -137,13 +155,14 @@ export default function SentinelOverviewPage() {
             compliance
           </div>
           <h3 className="text-lg font-semibold text-[#e4edf5]">
-            Regulations dashboard
+            Every rule, every circuit, in one table
           </h3>
           <p className="mt-2 text-xs text-[#9ab3c8]">
-            MiFID II RTS 6, CFTC Reg AT, FINRA 15c3-5, SEC Rule 613, MAR Art.
-            12, FINMA &amp; MAS. Static clause{"\u2192"}primitive crosswalk on top,
-            live would-block + alert counters that tick during drill runs
-            underneath.
+            Nine clauses across seven regulators &mdash; MiFID II, CFTC,
+            FINRA, SEC, MAR, FINMA, MAS &mdash; each sitting on the
+            exact control that satisfies it. When a regulator asks
+            &ldquo;show me the control for RTS 6&rdquo;, you point at
+            one row. Live counters tick underneath as the drills run.
           </p>
         </Link>
         <div className="rounded-lg border border-[#1a232e] bg-[#0f151d] p-5">
@@ -151,11 +170,13 @@ export default function SentinelOverviewPage() {
             Release · 2026-04-21
           </div>
           <h3 className="text-base font-semibold text-[#e4edf5]">
-            Core audit closed
+            33 issues found &mdash; 33 fixed
           </h3>
           <p className="mt-2 text-xs text-[#9ab3c8]">
-            14 S0 + 19 S1 findings resolved across four waves. Fresh-eyes
-            re-audit passed with zero new S0. Tag{" "}
+            We audited our own design in four passes and brought in a
+            fresh reviewer to check the result. Every critical and
+            high-severity finding is closed. Nothing left open above
+            medium. Frozen as{" "}
             <span className="font-mono text-[#e4edf5]">v1.0.0-core-audit-closed</span>.
           </p>
         </div>
