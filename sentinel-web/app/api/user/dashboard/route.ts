@@ -65,10 +65,25 @@ export async function GET() {
       try {
         const stripe = getStripe()
         const sub = await stripe.subscriptions.retrieve(publicMeta.stripeSubscriptionId)
+        // Stripe SDK 2025-11-17 moved current_period_end from the Subscription
+        // root onto Subscription.items.data[i].current_period_end. Fall back
+        // through both shapes so this compiles against either SDK version.
+        const subAny = sub as unknown as {
+          status: string
+          cancel_at_period_end: boolean
+          current_period_end?: number
+          items?: { data?: Array<{ current_period_end?: number }> }
+        }
+        const periodEnd =
+          subAny.current_period_end ??
+          subAny.items?.data?.[0]?.current_period_end ??
+          null
         subscription = {
-          status: sub.status,
-          currentPeriodEnd: new Date(sub.current_period_end * 1000).toISOString(),
-          cancelAtPeriodEnd: sub.cancel_at_period_end,
+          status: subAny.status,
+          currentPeriodEnd: periodEnd
+            ? new Date(periodEnd * 1000).toISOString()
+            : null,
+          cancelAtPeriodEnd: subAny.cancel_at_period_end,
         }
       } catch (error) {
         console.error("Failed to retrieve subscription:", error)
