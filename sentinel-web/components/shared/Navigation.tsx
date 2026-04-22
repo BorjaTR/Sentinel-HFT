@@ -11,11 +11,16 @@ import { cn } from "@/lib/utils";
 import { AuthButtons } from "./AuthButtons";
 import { useAuth } from "@/hooks/useAuth";
 
+// Top-bar navigation — Keyrock-demo focused. The legacy SaaS routes
+// (/analyze, /demo, /pricing, /dashboard, /sign-in, /sign-up) still
+// resolve but are not promoted here.
 const navLinks = [
   { href: "/", label: "Home" },
-  { href: "/analyze", label: "AI Analysis" },
-  { href: "/demo", label: "Live Demo" },
-  { href: "/pricing", label: "Pricing" },
+  { href: "/sentinel", label: "Demo" },
+  { href: "/sentinel/regulations", label: "Regulations" },
+  { href: "/sentinel/rca", label: "RCA" },
+  { href: "/sentinel/triage", label: "Triage" },
+  { href: "/sentinel/audit", label: "Audit" },
 ];
 
 export function Navigation() {
@@ -23,6 +28,13 @@ export function Navigation() {
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const { isSignedIn } = useAuth();
+
+  // The /sentinel/* routes have their own dark trading-floor shell
+  // (see app/sentinel/layout.tsx). Hide the global top bar there so we
+  // don't double up navigation.
+  if (pathname?.startsWith("/sentinel")) {
+    return null;
+  }
 
   useEffect(() => {
     const handleScroll = () => {

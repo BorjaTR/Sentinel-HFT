@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Github, Twitter, Mail, ExternalLink } from "lucide-react";
 import { Logo } from "./Logo";
 
@@ -32,6 +33,14 @@ const socialLinks = [
 ];
 
 export function Footer() {
+  // The /sentinel/* routes own their own chrome end-to-end, and the
+  // home page (`/`) carries its own Keyrock-styled footer. Hide the
+  // global footer in those places so we don't double up.
+  const pathname = usePathname();
+  if (pathname === "/" || pathname?.startsWith("/sentinel")) {
+    return null;
+  }
+
   return (
     <footer className="border-t border-dark-border bg-dark-bg/50">
       <div className="container mx-auto px-4 py-12">
