@@ -2,10 +2,11 @@ import Link from "next/link";
 import {
   ArrowRight,
   Github,
-  Briefcase,
   Cpu,
   ShieldCheck,
   Play,
+  Scale,
+  Brain,
 } from "lucide-react";
 
 // Two-audience landing. Trading desks (compliance + risk + ops) head
@@ -21,24 +22,54 @@ const PRIMARY = {
   icon: Play,
 };
 
-const AUDIENCES = [
+const FEATURES = [
   {
     href: "/sentinel",
-    icon: Briefcase,
-    title: "For trading desks",
-    audience: "Risk officers · compliance · ops · quants",
+    icon: Play,
+    title: "Live drills",
+    audience: "Risk · compliance · ops",
     blurb:
-      "Four scenarios every trading desk has lived through. Watch the system refuse orders from counterparties who would have picked you off; freeze the desk when the market tears itself apart; attach a stopwatch to every stage of every order; assemble the end-of-day packet a regulator would ask for. Each one takes under a minute and hands you back a report.",
-    cta: "Open the drills",
+      "Four scenarios every trading desk has lived through — toxic flow, market tearing itself apart, latency hunt, end-of-day packet. Each runs in under a minute and hands you back a report.",
+    cta: "Run a drill",
+    accent: "emerald",
+  },
+  {
+    href: "/sentinel/regulations",
+    icon: Scale,
+    title: "Regulatory crosswalk",
+    audience: "Compliance · legal · audit",
+    blurb:
+      "Every rule a regulator cites, mapped to the exact control that satisfies it. MiFID II, CFTC, FINRA, SEC, MAR, FINMA, MAS — 9 clauses across 4 jurisdictions, printable.",
+    cta: "Open the rulebook",
+    accent: "emerald",
+  },
+  {
+    href: "/sentinel/audit",
+    icon: ShieldCheck,
+    title: "Audit verifier",
+    audience: "Regulator · internal audit",
+    blurb:
+      "Every decision is sealed into a cryptographic chain. Change one byte anywhere and the seal points at the exact record that was touched. The regulator runs the verifier on their own laptop.",
+    cta: "Verify a chain",
+    accent: "emerald",
+  },
+  {
+    href: "/sentinel/rca",
+    icon: Brain,
+    title: "Incident AI",
+    audience: "Trading desk · compliance",
+    blurb:
+      "Nightly, a local AI writes the plain-English incident report. Live, three detectors rank alerts so the on-call sees the important one first. Runs on your hardware — no data leaves the building.",
+    cta: "Read a nightly digest",
     accent: "emerald",
   },
   {
     href: "/sentinel/hardware",
     icon: Cpu,
-    title: "For hardware engineers",
-    audience: "FPGA · RTL · CDC · timing · synthesis",
+    title: "Hardware design",
+    audience: "FPGA · RTL · synthesis",
     blurb:
-      "RTL contract, CDC story, reset discipline, audit log serialiser, pblock floorplan, Wave 0–4 verification methodology, and the synthesis evidence (Yosys + Vivado reports). Every block in the diagram links to the file that implements it.",
+      "RTL contract, CDC story, reset discipline, audit log serialiser, pblock floorplan, Wave 0–4 verification methodology, Yosys + Vivado reports. Every block in the diagram links to the file.",
     cta: "Open the hardware view",
     accent: "sky",
   },
@@ -134,22 +165,22 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Two-card audience switch */}
+      {/* Feature grid -- every surface is one click from the landing. */}
       <section className="border-b border-[#1a232e]">
         <div className="mx-auto max-w-6xl px-6 py-16">
           <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-[#9ab3c8]">
-            Pick your path
+            What&apos;s inside
           </div>
           <h2 className="text-2xl font-bold text-white">
-            Two audiences. Same pipeline.
+            Five surfaces. Every one clickable from here.
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-[#9ab3c8]">
-            The product is one piece — but the questions it answers
-            split cleanly. We don't try to put both on one page.
+            The product is one pipeline, but it shows up to different people
+            in different forms. Pick the one that answers your question.
           </p>
 
-          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-            {AUDIENCES.map(({ href, icon: Icon, title, audience, blurb, cta, accent }) => {
+          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map(({ href, icon: Icon, title, audience, blurb, cta, accent }) => {
               const accentBorder =
                 accent === "emerald"
                   ? "hover:border-emerald-500/40"
@@ -164,7 +195,7 @@ export default function Home() {
                 <Link
                   key={href}
                   href={href}
-                  className={`group relative flex flex-col overflow-hidden rounded-lg border border-[#1a232e] bg-[#0f151d] p-7 transition ${accentBorder} hover:bg-[#131c27]`}
+                  className={`group relative flex flex-col overflow-hidden rounded-lg border border-[#1a232e] bg-[#0f151d] p-6 transition ${accentBorder} hover:bg-[#131c27]`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="rounded-md border border-[#1a232e] bg-[#0a0e14] p-2.5">
@@ -174,17 +205,17 @@ export default function Home() {
                       className={`h-5 w-5 text-[#4d617a] transition group-hover:translate-x-0.5 ${accentArrow}`}
                     />
                   </div>
-                  <h3 className="mt-5 text-xl font-semibold text-white">
+                  <h3 className="mt-5 text-lg font-semibold text-white">
                     {title}
                   </h3>
                   <div className="mt-1 font-mono text-[10px] uppercase tracking-wider text-[#6b8196]">
                     {audience}
                   </div>
-                  <p className="mt-4 flex-1 text-sm leading-relaxed text-[#9ab3c8]">
+                  <p className="mt-3 flex-1 text-sm leading-relaxed text-[#9ab3c8]">
                     {blurb}
                   </p>
                   <div
-                    className={`mt-6 inline-flex items-center gap-2 font-mono text-xs ${accentText}`}
+                    className={`mt-5 inline-flex items-center gap-2 font-mono text-xs ${accentText}`}
                   >
                     {cta}
                     <ArrowRight className="h-3 w-3" />
@@ -257,12 +288,21 @@ export default function Home() {
           Sentinel-HFT v2.0 · synthetic fixtures only · no proprietary
           venue or firm data
         </p>
-        <div className="mt-3 flex justify-center gap-6 font-mono text-xs text-[#6b8196]">
+        <div className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-2 font-mono text-xs text-[#6b8196]">
           <Link href="/sentinel/about" className="hover:text-emerald-400">
             About
           </Link>
           <Link href="/sentinel" className="hover:text-emerald-400">
-            Trading desks
+            Drills
+          </Link>
+          <Link href="/sentinel/regulations" className="hover:text-emerald-400">
+            Regulations
+          </Link>
+          <Link href="/sentinel/audit" className="hover:text-emerald-400">
+            Audit
+          </Link>
+          <Link href="/sentinel/rca" className="hover:text-emerald-400">
+            Incident AI
           </Link>
           <Link href="/sentinel/hardware" className="hover:text-emerald-400">
             Hardware

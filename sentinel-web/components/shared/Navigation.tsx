@@ -19,7 +19,10 @@ import { useAuth } from "@/hooks/useAuth";
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/sentinel/about", label: "About" },
-  { href: "/sentinel", label: "Trading desks" },
+  { href: "/sentinel", label: "Drills" },
+  { href: "/sentinel/regulations", label: "Regulations" },
+  { href: "/sentinel/audit", label: "Audit" },
+  { href: "/sentinel/rca", label: "AI" },
   { href: "/sentinel/hardware", label: "Hardware" },
 ];
 
@@ -67,8 +70,8 @@ export function Navigation() {
         </Link>
 
         {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center gap-8">
-          <div className="flex items-center gap-6">
+        <div className="hidden md:flex items-center gap-6">
+          <div className="flex items-center gap-5">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
