@@ -75,6 +75,9 @@ package risk_pkg;
     RISK_ORDER_SIZE      = 8'h04,
     RISK_KILL_SWITCH     = 8'h05,
     RISK_INVALID_ORDER   = 8'h06,
+    // Phase-1 additions (mirror sentinel_hft/golden/risk_gate.py)
+    RISK_FAT_FINGER      = 8'h07,
+    RISK_ALLOWLIST_BLOCK = 8'h08,
     RISK_DISABLED        = 8'hFF
   } risk_reject_e;
 

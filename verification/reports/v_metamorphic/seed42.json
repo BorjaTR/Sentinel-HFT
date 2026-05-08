@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "seed": 42,
+  "pairs_per_relation": 10000,
+  "elapsed_s": 0.374,
+  "relations": [
+    {
+      "name": "M1_order_id_invariance",
+      "n_pairs": 10000,
+      "violations": 0,
+      "ok": true
+    },
+    {
+      "name": "M2_side_symmetry",
+      "n_pairs": 10000,
+      "violations": 0,
+      "ok": true
+    },
+    {
+      "name": "M3_scale_invariance",
+      "n_pairs": 10000,
+      "violations": 0,
+      "ok": true
+    },
+    {
+      "name": "M4_independence_permutation",
+      "n_pairs": 10000,
+      "violations": 0,
+      "ok": true
+    }
+  ],
+  "ok": true
+}

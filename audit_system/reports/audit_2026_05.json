@@ -1,21 +1,24 @@
 {
   "schema_version": 1,
   "period": "2026-05",
-  "commit": "66576631b94a",
-  "ran_at": "2026-05-08T06:19:52.765946Z",
+  "commit": "1966d00bebe1",
+  "ran_at": "2026-05-08T06:37:08.558798Z",
   "axes": {
     "a_spec": {
       "axis": "a_spec",
       "status": "PASS",
-      "summary": "All 7 declared files present.",
+      "summary": "All 10 declared files present.",
       "details": {
         "hashes": {
           "fpga/regmap.yaml": "1dca2b9c5e20f262a0ae15d44b67583d9552ee22c61022bf09cff73c96879084",
-          "rtl/risk_pkg.sv": "da0f2ce0e6b43583b4b9c072f65e2d723249c5f312465964c2e5d4fcdcc52c8a",
+          "rtl/risk_pkg.sv": "268ad6683941a1325cf884e9a525f28e4bf5fec6d52b99cf00a200c753c55e1b",
           "rtl/risk_gate.sv": "1a9b73f649191f0959ce5ff8dacedccb7e92049354ded33f6a455654a187a39a",
+          "rtl/risk_gate_v2.sv": "f4b38604224a7d03000f1c6baf5747383a69c5a048af6ba92ae7210304a21778",
           "rtl/position_limiter.sv": "28d37a9b05be8cbed6c0bf98c5ea89e7c751208309eae3c121bb8dc7f40eaf3b",
           "rtl/rate_limiter.sv": "009a31c4b4ecbc78a3644e55f88eaa16ca32dc1d920f725da9f419ba258496f0",
           "rtl/kill_switch.sv": "5f7b1899aa6893373e16ab7252d40d55cd81a54c15277e4af2ca79bae4a62f58",
+          "rtl/fat_finger_band.sv": "8428ec3136b11e041e92d61381a57a413904b3eeed544b72cb32f2733987d19b",
+          "rtl/symbol_allowlist.sv": "3bb7b94374c783e7765a7b87413bd558e48b72f3c7a051b36ae601299b2dce96",
           "rtl/risk_audit_log.sv": "b4c0438b2f0b2e7f504507f33e9a526ffce20371e264fd081308a1cf6aa84bb6"
         }
       }

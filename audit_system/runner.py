@@ -41,14 +41,17 @@ def _axis_a_spec(pre_reg: Dict) -> Dict:
     """Hash regmap.yaml + key RTL files; compare to pre-reg if declared."""
     files = pre_reg.get("a_spec", {}).get("files", [])
     if not files:
-        # default Phase-1 set
+        # default Phase-1 set (extended 2026-05-08 with v2 composer + new modules)
         files = [
             "fpga/regmap.yaml",
             "rtl/risk_pkg.sv",
             "rtl/risk_gate.sv",
+            "rtl/risk_gate_v2.sv",
             "rtl/position_limiter.sv",
             "rtl/rate_limiter.sv",
             "rtl/kill_switch.sv",
+            "rtl/fat_finger_band.sv",
+            "rtl/symbol_allowlist.sv",
             "rtl/risk_audit_log.sv",
         ]
     hashes: Dict[str, str] = {}

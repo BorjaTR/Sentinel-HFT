@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "commit": "1966d00bebe1",
+  "ran_at": "2026-05-08T06:36:29.270105Z",
+  "axes": {
+    "v_floor": {
+      "axis": "v_floor",
+      "status": "PASS",
+      "summary": "Golden corpus determinism verified across all canonical seeds.",
+      "details": {
+        "stdout_tail": [
+          "  seed=1 n=50000 sha=c9e5b41ceaa9a3eb\u2026  OK",
+          "  seed=7 n=50000 sha=a1ad6062160fcd84\u2026  OK",
+          "  seed=42 n=50000 sha=246d6fd3199da2ae\u2026  OK",
+          "  seed=1337 n=50000 sha=61eb27b649ae1263\u2026  OK",
+          "  seed=271828 n=50000 sha=940064f7e26a3f08\u2026  OK",
+          "",
+          "Determinism check OK across 5 seeds."
+        ]
+      }
+    },
+    "v_mutation": {
+      "axis": "v_mutation",
+      "status": "SKIP",
+      "summary": "Mutation testing harness not yet built \u2014 Phase 1 sub-task pending.",
+      "details": {
+        "todo": "verification/v_mutation/inject.py"
+      }
+    },
+    "v_metamorphic": {
+      "axis": "v_metamorphic",
+      "status": "PASS",
+      "summary": "All 4 metamorphic relations held across 10k pairs each.",
+      "details": {
+        "stdout_tail": [
+          "V-Meta seed=42 pairs=10000  0.38s",
+          "  [OK ] M1_order_id_invariance            violations=0/10000",
+          "  [OK ] M2_side_symmetry                  violations=0/10000",
+          "  [OK ] M3_scale_invariance               violations=0/10000",
+          "  [OK ] M4_independence_permutation       violations=0/10000"
+        ]
+      }
+    },
+    "v_parity": {
+      "axis": "v_parity",
+      "status": "SKIP",
+      "summary": "RTL/gate-sim parity harness not yet wired \u2014 Phase 1 sub-task pending.",
+      "details": {
+        "todo": "verification/v_parity/three_engine.py"
+      }
+    },
+    "v_contract": {
+      "axis": "v_contract",
+      "status": "PASS",
+      "summary": "regmap.yaml: 8 blocks, 52 registers; no overlaps, no duplicate offsets.",
+      "details": {
+        "regmap_version": "0.1.0",
+        "block_count": 8,
+        "register_count": 52
+      }
+    },
+    "v_tamper": {
+      "axis": "v_tamper",
+      "status": "SKIP",
+      "summary": "Audit-chain tamper-injection harness not yet built \u2014 Phase 1 sub-task pending.",
+      "details": {
+        "todo": "verification/v_tamper/tamper_inject.py"
+      }
+    }
+  }
+}

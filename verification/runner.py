@@ -88,11 +88,42 @@ def _axis_v_mutation() -> Dict:
 
 
 def _axis_v_metamorphic() -> Dict:
+    """V-Meta: four relations × 10k pairs each.
+
+    Phase-1 budget is 10k pairs/relation (40k total checks, ~0.4s).
+    Pre-reg ship target is 100k pairs/relation; the runner's CI mode
+    can be invoked with --pairs 100000 if a deeper run is desired.
+    """
+    res = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "verification.v_metamorphic.relations",
+            "--seed", "42",
+            "--pairs", "10000",
+            "--out", str(REPORTS_DIR / "v_metamorphic" / "ci.json"),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    out_lines = res.stdout.splitlines()
+    if res.returncode == 0:
+        return {
+            "axis": "v_metamorphic",
+            "status": "PASS",
+            "summary": "All 4 metamorphic relations held across 10k pairs each.",
+            "details": {"stdout_tail": out_lines[-6:]},
+        }
     return {
         "axis": "v_metamorphic",
-        "status": "SKIP",
-        "summary": "Metamorphic relation suite not yet built — Phase 1 sub-task pending.",
-        "details": {"todo": "verification/v_metamorphic/relations.py"},
+        "status": "FAIL",
+        "summary": "One or more metamorphic relations violated.",
+        "details": {
+            "exit_code": res.returncode,
+            "stdout_tail": out_lines[-10:],
+            "stderr_tail": res.stderr.splitlines()[-10:],
+        },
     }
 
 
