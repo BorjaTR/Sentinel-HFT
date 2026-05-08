@@ -47,16 +47,17 @@ Legend: **NOT STARTED** | **IN PROGRESS** | **GATES PASSING** | **CLOSED**
 | Behavioral golden model (`golden/risk_gate.py`)| DONE        |
 | V-Floor random corpus + manifest determinism   | DONE        |
 | V-Contract regmap schema check                 | DONE        |
-| V-gate runner skeleton                         | DONE        |
-| A-gate runner skeleton                         | DONE        |
-| Spec→RTL traceability matrix                   | TODO        |
-| Verilator parity harness (V-Floor RTL leg)     | TODO        |
+| V-Meta metamorphic suite (4 relations × 10k)   | DONE        |
+| V-Parity cocotb/Verilator harness (skips clean)| DONE        |
+| V-gate runner                                  | DONE        |
+| A-gate runner                                  | DONE        |
+| Spec→RTL traceability matrix                   | DONE        |
+| `docs/fpga/ARCHITECTURE.md`                    | DONE        |
+| `rtl/fat_finger_band.sv` module                | DONE        |
+| `rtl/symbol_allowlist.sv` module               | DONE        |
+| `rtl/risk_gate_v2.sv` composer                 | DONE        |
 | Mutation testing harness (V-Mut)               | TODO        |
-| Metamorphic relation suite (V-Meta)            | TODO        |
-| Cross-engine parity harness (V-Parity)         | TODO        |
 | Tamper-injection harness (V-Tamper)            | TODO        |
-| `rtl/fat_finger_band.sv` module                | TODO        |
-| `rtl/symbol_allowlist.sv` module               | TODO        |
 | Vivado P&R + timing closure at 100 MHz         | TODO        |
 | Bitstream reproducibility check                | TODO        |
 | External review of `risk_audit_log.sv`         | TODO        |
@@ -66,10 +67,10 @@ Legend: **NOT STARTED** | **IN PROGRESS** | **GATES PASSING** | **CLOSED**
 
 | Axis        | Status      | Last run     | Report |
 |-------------|-------------|--------------|--------|
-| V-Floor     | **PASS**    | 2026-05-08   | golden corpus determinism, 5 seeds |
+| V-Floor     | **PASS**    | 2026-05-08   | golden corpus determinism, 5 seeds × 50k orders |
 | V-Mut       | SKIP (TODO) | —            | harness pending |
-| V-Meta      | SKIP (TODO) | —            | suite pending |
-| V-Parity    | SKIP (TODO) | —            | RTL leg pending |
+| V-Meta      | **PASS**    | 2026-05-08   | 4 relations × 10k pairs, 0 violations (40k checks) |
+| V-Parity    | SKIP (env)  | —            | harness ready; needs Verilator + cocotb on host |
 | V-Contract  | **PASS**    | 2026-05-08   | regmap.yaml: 8 blocks / 52 regs / no overlaps |
 | V-Tamper    | SKIP (TODO) | —            | harness pending |
 

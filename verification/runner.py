@@ -128,11 +128,106 @@ def _axis_v_metamorphic() -> Dict:
 
 
 def _axis_v_parity() -> Dict:
+    """V-Parity: RTL ≡ golden on the canonical V-Floor seed.
+
+    Requires Verilator + cocotb on the host. If either is missing,
+    returns SKIP with a clear reason — this keeps CI green on machines
+    without an FPGA toolchain installed.
+    """
+    import shutil
+
+    # Tooling availability
+    has_verilator = shutil.which("verilator") is not None
+    try:
+        import cocotb  # type: ignore  # noqa: F401
+        has_cocotb = True
+    except ImportError:
+        has_cocotb = False
+
+    if not (has_verilator and has_cocotb):
+        return {
+            "axis": "v_parity",
+            "status": "SKIP",
+            "summary": "Verilator and/or cocotb not available — see verification/v_parity/README.md.",
+            "details": {
+                "verilator_found": has_verilator,
+                "cocotb_found": has_cocotb,
+            },
+        }
+
+    # Canonical run: seed 42 × 50k. Other manifest seeds exercised manually.
+    corpus = (
+        REPO_ROOT
+        / "verification" / "reports" / "v_floor"
+        / "golden_seed42_n50000.json"
+    )
+    if not corpus.exists():
+        return {
+            "axis": "v_parity",
+            "status": "SKIP",
+            "summary": "V-Floor canonical corpus not on disk; run "
+                       "`python -m verification.v_floor.regenerate_and_verify` first.",
+            "details": {"corpus_expected": str(corpus)},
+        }
+
+    # 1. Build + run the parity sim
+    sim_res = subprocess.run(
+        ["make", "sim", f"PARITY_CORPUS={corpus}"],
+        cwd=REPO_ROOT / "verification" / "v_parity",
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+    if sim_res.returncode != 0:
+        return {
+            "axis": "v_parity",
+            "status": "FAIL",
+            "summary": "Verilator/cocotb sim failed.",
+            "details": {
+                "stdout_tail": sim_res.stdout.splitlines()[-30:],
+                "stderr_tail": sim_res.stderr.splitlines()[-30:],
+            },
+        }
+
+    # 2. Compare
+    rtl_out = (
+        REPO_ROOT
+        / "verification" / "reports" / "v_parity"
+        / "rtl_seed42_n50000.json"
+    )
+    out_path = (
+        REPO_ROOT
+        / "verification" / "reports" / "v_parity"
+        / "parity_seed42.json"
+    )
+    cmp_res = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "verification.v_parity.compare",
+            "--golden", str(corpus),
+            "--rtl",    str(rtl_out),
+            "--out",    str(out_path),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if cmp_res.returncode == 0:
+        return {
+            "axis": "v_parity",
+            "status": "PASS",
+            "summary": "RTL ≡ golden, 0 diffs over 50k orders.",
+            "details": {"comparator_stdout": cmp_res.stdout.strip()},
+        }
     return {
         "axis": "v_parity",
-        "status": "SKIP",
-        "summary": "RTL/gate-sim parity harness not yet wired — Phase 1 sub-task pending.",
-        "details": {"todo": "verification/v_parity/three_engine.py"},
+        "status": "FAIL",
+        "summary": "RTL diverged from golden.",
+        "details": {
+            "comparator_stdout": cmp_res.stdout.strip(),
+            "comparator_stderr": cmp_res.stderr.strip(),
+        },
     }
 
 
