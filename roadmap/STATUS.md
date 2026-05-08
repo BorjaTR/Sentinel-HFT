@@ -1,7 +1,7 @@
 # Sentinel-HFT — Build Status
 
 **Last updated:** 2026-05-08
-**Overall phase:** Phase 1 (FPGA Floor) — IN PROGRESS
+**Overall phase:** Phase 1 (FPGA Floor) — **PARTIAL CLOSE** · Phase 2 (FIX adapter) NEXT
 
 This file is the single canonical view of where the build is. Updated whenever
 a phase or sub-task changes state. See [ROADMAP_TO_LAUNCH.md](../ROADMAP_TO_LAUNCH.md)
@@ -13,8 +13,8 @@ for the plan.
 
 | #  | Phase                                       | Status          | Pre-reg | V-gate | A-gate |
 |----|---------------------------------------------|-----------------|---------|--------|--------|
-| 1  | FPGA Floor                                  | IN PROGRESS     | LOCKED  | —      | —      |
-| 2  | Wire-Protocol Adapter (FIX 4.4)             | NOT STARTED     | —       | —      | —      |
+| 1  | FPGA Floor                                  | PARTIAL CLOSE   | LOCKED  | 5/6    | 2/2    |
+| 2  | Wire-Protocol Adapter (FIX 4.4)             | IN PROGRESS     | —       | —      | —      |
 | 3  | Failover & State Replication                | NOT STARTED     | —       | —      | —      |
 | 4  | Policy & Config Plane                       | NOT STARTED     | —       | —      | —      |
 | 5  | Audit Chain Persistence + Auditor Read      | NOT STARTED     | —       | —      | —      |
@@ -68,11 +68,11 @@ Legend: **NOT STARTED** | **IN PROGRESS** | **GATES PASSING** | **CLOSED**
 | Axis        | Status      | Last run     | Report |
 |-------------|-------------|--------------|--------|
 | V-Floor     | **PASS**    | 2026-05-08   | golden corpus determinism, 5 seeds × 50k orders |
-| V-Mut       | SKIP (TODO) | —            | harness pending |
+| V-Mut       | **PASS**    | 2026-05-08   | 0/21 in-scope survivors (0%) |
 | V-Meta      | **PASS**    | 2026-05-08   | 4 relations × 10k pairs, 0 violations (40k checks) |
 | V-Parity    | SKIP (env)  | —            | harness ready; needs Verilator + cocotb on host |
 | V-Contract  | **PASS**    | 2026-05-08   | regmap.yaml: 8 blocks / 52 regs / no overlaps |
-| V-Tamper    | SKIP (TODO) | —            | harness pending |
+| V-Tamper    | **PASS**    | 2026-05-08   | 100/100 attempts detected, 7 families |
 
 ### A-Gates (Phase-1 active subset)
 

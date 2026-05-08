@@ -1,0 +1,71 @@
+phase_id: 02
+phase_name: "Wire-Protocol Adapter (FIX 4.4)"
+locked_at: "2026-05-08T08:30:00Z"
+locked_by: "Borja Tarazona"
+production_lock: false
+posthoc: false
+
+goal: >
+  A FIX 4.4 session manager that proxies orders through the gate.
+  Supports NewOrderSingle, OrderCancelRequest, OrderCancelReplaceRequest.
+  Accepts produce a byte-exact pass-through to downstream; rejects emit
+  an ExecutionReport with the gate's reject reason and the audit-chain
+  segment hash.
+
+scope_in:
+  fix_version: "4.4"
+  message_types:
+    - "0    Heartbeat"
+    - "1    TestRequest"
+    - "2    ResendRequest"
+    - "4    SequenceReset"
+    - "A    Logon"
+    - "5    Logout"
+    - "D    NewOrderSingle"
+    - "F    OrderCancelRequest"
+    - "G    OrderCancelReplaceRequest"
+    - "8    ExecutionReport (out)"
+    - "j    BusinessMessageReject (out)"
+  features:
+    - session_management        # logon, heartbeats, sequence numbers, resend
+    - msg_parser                # FIX tag-value with checksum
+    - msg_emitter
+    - gate_inject               # synchronous decision per NewOrderSingle
+    - reject_emitter            # ExecutionReport on gate-reject
+    - pcap_replay_harness
+
+scope_out:
+  - "FIX 5.0 SP2 (Phase 16+ backlog)"
+  - "Native exchange binary (ITCH/OUCH) (Phase 16+ backlog)"
+  - "Drop-copy"
+  - "Multi-session aggregation"
+
+v_gates:
+  v_protocol_round_trip:
+    method: |
+      For 100 captured/synthetic FIX sessions: parse → emit → parse, assert
+      round-trip equality. Then drive each session into the adapter end-to-end
+      and assert (a) byte-exact pass-through on accept, (b) ExecutionReport
+      on reject with the right reject reason text.
+    pass_threshold: "100/100 sessions, 0 byte differences on accepts."
+    artifact: "verification/reports/v_protocol/phase02_roundtrip.json"
+
+  v_protocol_fuzz:
+    method: |
+      libFuzzer-style harness: feed 10^7 random byte sequences to the parser.
+      Pass = no crashes, all malformed messages rejected with a typed error.
+    pass_threshold: "0 crashes, 100% rejected with typed error."
+    artifact: "verification/reports/v_protocol/phase02_fuzz.json"
+
+a_gates:
+  a_msg_coverage:
+    method: "Every advertised message type has ≥1 test."
+    pass_threshold: "100% coverage."
+
+ship_criterion:
+  - "v_protocol_round_trip PASS"
+  - "v_protocol_fuzz PASS"
+  - "a_msg_coverage PASS"
+  - "session manager handles re-logon, sequence reset, and resend correctly"
+
+amendments: []
