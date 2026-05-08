@@ -2,7 +2,7 @@
   "schema_version": 1,
   "seed": 42,
   "pairs_per_relation": 10000,
-  "elapsed_s": 0.384,
+  "elapsed_s": 0.387,
   "relations": [
     {
       "name": "M1_order_id_invariance",

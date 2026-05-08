@@ -21,6 +21,15 @@ from .risk_gate import (
     Fill,
     evaluate_stream,
 )
+from .audit_chain import (
+    GoldenAuditChain,
+    ChainSegment,
+    ChainVerificationError,
+    DECISION_BYTES,
+    HEAD_BYTES,
+    encode_decision,
+    verify_chain,
+)
 
 __all__ = [
     "GoldenRiskGate",
@@ -32,4 +41,11 @@ __all__ = [
     "RejectReason",
     "Fill",
     "evaluate_stream",
+    "GoldenAuditChain",
+    "ChainSegment",
+    "ChainVerificationError",
+    "DECISION_BYTES",
+    "HEAD_BYTES",
+    "encode_decision",
+    "verify_chain",
 ]

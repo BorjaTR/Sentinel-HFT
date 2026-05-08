@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "commit": "a94829c2271d",
+  "ran_at": "2026-05-08T08:00:23.810032Z",
+  "axes": {
+    "v_floor": {
+      "axis": "v_floor",
+      "status": "PASS",
+      "summary": "Golden corpus determinism verified across all canonical seeds.",
+      "details": {
+        "stdout_tail": [
+          "  seed=1 n=50000 sha=c9e5b41ceaa9a3eb\u2026  OK",
+          "  seed=7 n=50000 sha=a1ad6062160fcd84\u2026  OK",
+          "  seed=42 n=50000 sha=246d6fd3199da2ae\u2026  OK",
+          "  seed=1337 n=50000 sha=61eb27b649ae1263\u2026  OK",
+          "  seed=271828 n=50000 sha=940064f7e26a3f08\u2026  OK",
+          "",
+          "Determinism check OK across 5 seeds."
+        ]
+      }
+    },
+    "v_mutation": {
+      "axis": "v_mutation",
+      "status": "PASS",
+      "summary": "Mutation survival rate \u2264 5% on the golden decision path.",
+      "details": {
+        "stdout_tail": [
+          "",
+          "V-Mut python: 21/21 killed, 0 survived, survival_rate=0.00%",
+          "  OK: \u2264 5% survival."
+        ]
+      }
+    },
+    "v_metamorphic": {
+      "axis": "v_metamorphic",
+      "status": "PASS",
+      "summary": "All 4 metamorphic relations held across 10k pairs each.",
+      "details": {
+        "stdout_tail": [
+          "V-Meta seed=42 pairs=10000  0.39s",
+          "  [OK ] M1_order_id_invariance            violations=0/10000",
+          "  [OK ] M2_side_symmetry                  violations=0/10000",
+          "  [OK ] M3_scale_invariance               violations=0/10000",
+          "  [OK ] M4_independence_permutation       violations=0/10000"
+        ]
+      }
+    },
+    "v_parity": {
+      "axis": "v_parity",
+      "status": "SKIP",
+      "summary": "Verilator and/or cocotb not available \u2014 see verification/v_parity/README.md.",
+      "details": {
+        "verilator_found": false,
+        "cocotb_found": false
+      }
+    },
+    "v_contract": {
+      "axis": "v_contract",
+      "status": "PASS",
+      "summary": "regmap.yaml: 8 blocks, 52 registers; no overlaps, no duplicate offsets.",
+      "details": {
+        "regmap_version": "0.1.0",
+        "block_count": 8,
+        "register_count": 52
+      }
+    },
+    "v_tamper": {
+      "axis": "v_tamper",
+      "status": "PASS",
+      "summary": "100/100 tamper attempts detected by golden chain verifier.",
+      "details": {
+        "stdout_tail": [
+          "V-Tamper seed=42 attempts=100  0.12s",
+          "  T1_bitflip_decision       detected 15/15",
+          "  T2_bitflip_head           detected 15/15",
+          "  T3_swap_adjacent          detected 14/14",
+          "  T4_insert_fabricated      detected 14/14",
+          "  T5_delete_one             detected 14/14",
+          "  T6_replay                 detected 14/14",
+          "  T7_truncate_tail          detected 14/14",
+          "  total: 100/100 detected",
+          "  OK: all tampers detected."
+        ]
+      }
+    }
+  }
+}

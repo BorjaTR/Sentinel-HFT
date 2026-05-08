@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "seed": 42,
+  "n_attempts": 100,
+  "detected": 100,
+  "undetected": 0,
+  "ok": true,
+  "elapsed_s": 0.117,
+  "by_kind": {
+    "T1_bitflip_decision": {
+      "tries": 15,
+      "detected": 15
+    },
+    "T2_bitflip_head": {
+      "tries": 15,
+      "detected": 15
+    },
+    "T3_swap_adjacent": {
+      "tries": 14,
+      "detected": 14
+    },
+    "T4_insert_fabricated": {
+      "tries": 14,
+      "detected": 14
+    },
+    "T5_delete_one": {
+      "tries": 14,
+      "detected": 14
+    },
+    "T6_replay": {
+      "tries": 14,
+      "detected": 14
+    },
+    "T7_truncate_tail": {
+      "tries": 14,
+      "detected": 14
+    }
+  },
+  "details": [
+    {
+      "i": 0,
+      "kind": "T1_bitflip_decision",
+      "detected": true,
+      "reason": "hash_mismatch",
+      "at_seq": 164
+    },
+    {
+      "i": 1,
+      "kind": "T2_bitflip_head",
+      "detected": true,
+      "reason": "hash_mismatch",
+      "at_seq": 7
+    },
+    {
+      "i": 2,
+      "kind": "T3_swap_adjacent",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 64
+    },
+    {
+      "i": 3,
+      "kind": "T4_insert_fabricated",
+      "detected": true,
+      "reason": "hash_mismatch",
+      "at_seq": 59
+    },
+    {
+      "i": 4,
+      "kind": "T5_delete_one",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 38
+    },
+    {
+      "i": 5,
+      "kind": "T6_replay",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 189
+    },
+    {
+      "i": 6,
+      "kind": "T7_truncate_tail",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 200
+    },
+    {
+      "i": 7,
+      "kind": "T1_bitflip_decision",
+      "detected": true,
+      "reason": "hash_mismatch",
+      "at_seq": 174
+    },
+    {
+      "i": 8,
+      "kind": "T2_bitflip_head",
+      "detected": true,
+      "reason": "hash_mismatch",
+      "at_seq": 140
+    },
+    {
+      "i": 9,
+      "kind": "T3_swap_adjacent",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 153
+    },
+    {
+      "i": 10,
+      "kind": "T4_insert_fabricated",
+      "detected": true,
+      "reason": "hash_mismatch",
+      "at_seq": 110
+    },
+    {
+      "i": 11,
+      "kind": "T5_delete_one",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 11
+    },
+    {
+      "i": 12,
+      "kind": "T6_replay",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 8
+    },
+    {
+      "i": 13,
+      "kind": "T7_truncate_tail",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 200
+    },
+    {
+      "i": 14,
+      "kind": "T1_bitflip_decision",
+      "detected": true,
+      "reason": "hash_mismatch",
+      "at_seq": 56
+    },
+    {
+      "i": 15,
+      "kind": "T2_bitflip_head",
+      "detected": true,
+      "reason": "hash_mismatch",
+      "at_seq": 130
+    },
+    {
+      "i": 16,
+      "kind": "T3_swap_adjacent",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 145
+    },
+    {
+      "i": 17,
+      "kind": "T4_insert_fabricated",
+      "detected": true,
+      "reason": "hash_mismatch",
+      "at_seq": 52
+    },
+    {
+      "i": 18,
+      "kind": "T5_delete_one",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 186
+    },
+    {
+      "i": 19,
+      "kind": "T6_replay",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 167
+    },
+    {
+      "i": 20,
+      "kind": "T7_truncate_tail",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 200
+    },
+    {
+      "i": 21,
+      "kind": "T1_bitflip_decision",
+      "detected": true,
+      "reason": "hash_mismatch",
+      "at_seq": 140
+    },
+    {
+      "i": 22,
+      "kind": "T2_bitflip_head",
+      "detected": true,
+      "reason": "hash_mismatch",
+      "at_seq": 57
+    },
+    {
+      "i": 23,
+      "kind": "T3_swap_adjacent",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 152
+    },
+    {
+      "i": 24,
+      "kind": "T4_insert_fabricated",
+      "detected": true,
+      "reason": "hash_mismatch",
+      "at_seq": 73
+    },
+    {
+      "i": 25,
+      "kind": "T5_delete_one",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 4
+    },
+    {
+      "i": 26,
+      "kind": "T6_replay",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 195
+    },
+    {
+      "i": 27,
+      "kind": "T7_truncate_tail",
+      "detected": true,
+      "reason": "sequence_gap",
+      "at_seq": 200
+    },
+    {
+      "i": 28,
+      "kind": "T1_bitflip_decision",
+      "detected": true,
+      "reason": "hash_mismatch",
+      "at_seq": 179
+    },
+    {
+      "i": 29,
+      "kind": "T2_bitflip_head",
+      "detected": true,
+      "reason": "hash_mismatch",
+      "at_seq": 88
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "n_mutations": 21,
+  "n_killed": 21,
+  "n_survived": 0,
+  "survival_rate": 0.0,
+  "survivors": [],
+  "ok": true
+}

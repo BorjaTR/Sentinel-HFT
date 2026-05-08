@@ -79,11 +79,45 @@ def _axis_v_floor() -> Dict:
 
 
 def _axis_v_mutation() -> Dict:
+    """V-Mut: Python leg — every operator-flip mutation in the golden's
+    decision-affecting methods must be killed by the test suite.
+    Pre-reg ship target: ≤ 5% survival.
+
+    The RTL leg (mutating .sv files + re-running V-Parity) requires
+    Verilator + cocotb and is not run here; it would be added when
+    V-Parity itself is exercised on a host with the toolchain.
+    """
+    res = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "verification.v_mutation.mutate_python",
+            "--max-mutations", "50",
+            "--seed", "42",
+            "--out", str(REPORTS_DIR / "v_mutation" / "ci.json"),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+    out_lines = res.stdout.splitlines()
+    if res.returncode == 0:
+        return {
+            "axis": "v_mutation",
+            "status": "PASS",
+            "summary": "Mutation survival rate ≤ 5% on the golden decision path.",
+            "details": {"stdout_tail": out_lines[-3:]},
+        }
     return {
         "axis": "v_mutation",
-        "status": "SKIP",
-        "summary": "Mutation testing harness not yet built — Phase 1 sub-task pending.",
-        "details": {"todo": "verification/v_mutation/inject.py"},
+        "status": "FAIL",
+        "summary": "Mutation survival rate exceeded 5%.",
+        "details": {
+            "exit_code": res.returncode,
+            "stdout_tail": out_lines[-15:],
+            "stderr_tail": res.stderr.splitlines()[-15:],
+        },
     }
 
 
@@ -321,11 +355,41 @@ def _axis_v_contract() -> Dict:
 
 
 def _axis_v_tamper() -> Dict:
+    """V-Tamper: 100 tamper attempts against the golden chain reference.
+
+    Pre-reg ship target: 100/100 detected.
+    """
+    res = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "verification.v_tamper.tamper_inject",
+            "--n-attempts", "100",
+            "--seed", "42",
+            "--out", str(REPORTS_DIR / "v_tamper" / "ci.json"),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    out_lines = res.stdout.splitlines()
+    if res.returncode == 0:
+        return {
+            "axis": "v_tamper",
+            "status": "PASS",
+            "summary": "100/100 tamper attempts detected by golden chain verifier.",
+            "details": {"stdout_tail": out_lines[-10:]},
+        }
     return {
         "axis": "v_tamper",
-        "status": "SKIP",
-        "summary": "Audit-chain tamper-injection harness not yet built — Phase 1 sub-task pending.",
-        "details": {"todo": "verification/v_tamper/tamper_inject.py"},
+        "status": "FAIL",
+        "summary": "Tamper attempt(s) went undetected.",
+        "details": {
+            "exit_code": res.returncode,
+            "stdout_tail": out_lines[-15:],
+            "stderr_tail": res.stderr.splitlines()[-15:],
+        },
     }
 
 
