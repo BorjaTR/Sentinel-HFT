@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "period": "2026-05",
+  "commit": "66576631b94a",
+  "ran_at": "2026-05-08T06:19:52.765946Z",
+  "axes": {
+    "a_spec": {
+      "axis": "a_spec",
+      "status": "PASS",
+      "summary": "All 7 declared files present.",
+      "details": {
+        "hashes": {
+          "fpga/regmap.yaml": "1dca2b9c5e20f262a0ae15d44b67583d9552ee22c61022bf09cff73c96879084",
+          "rtl/risk_pkg.sv": "da0f2ce0e6b43583b4b9c072f65e2d723249c5f312465964c2e5d4fcdcc52c8a",
+          "rtl/risk_gate.sv": "1a9b73f649191f0959ce5ff8dacedccb7e92049354ded33f6a455654a187a39a",
+          "rtl/position_limiter.sv": "28d37a9b05be8cbed6c0bf98c5ea89e7c751208309eae3c121bb8dc7f40eaf3b",
+          "rtl/rate_limiter.sv": "009a31c4b4ecbc78a3644e55f88eaa16ca32dc1d920f725da9f419ba258496f0",
+          "rtl/kill_switch.sv": "5f7b1899aa6893373e16ab7252d40d55cd81a54c15277e4af2ca79bae4a62f58",
+          "rtl/risk_audit_log.sv": "b4c0438b2f0b2e7f504507f33e9a526ffce20371e264fd081308a1cf6aa84bb6"
+        }
+      }
+    },
+    "a_forward": {
+      "axis": "a_forward",
+      "status": "SKIP",
+      "summary": "Not in this audit's axes_active list.",
+      "details": {}
+    },
+    "a_coverage": {
+      "axis": "a_coverage",
+      "status": "PASS",
+      "summary": "All 7 declared rules have \u22651 test.",
+      "details": {
+        "per_rule": {
+          "notional_cap_per_order": {
+            "matched": [
+              "ORDER_SIZE",
+              "max_order_qty"
+            ],
+            "ok": true
+          },
+          "notional_cap_aggregated_rolling": {
+            "matched": [
+              "NOTIONAL_LIMIT",
+              "max_notional"
+            ],
+            "ok": true
+          },
+          "position_cap_aggregated": {
+            "matched": [
+              "POSITION_LIMIT",
+              "long_cap",
+              "max_long",
+              "max_short"
+            ],
+            "ok": true
+          },
+          "order_rate_cap": {
+            "matched": [
+              "RATE_LIMITED",
+              "rate_limit",
+              "rate_max_tokens"
+            ],
+            "ok": true
+          },
+          "fat_finger_price_band": {
+            "matched": [
+              "FAT_FINGER",
+              "fat_finger",
+              "ff_band_bps"
+            ],
+            "ok": true
+          },
+          "symbol_allowlist": {
+            "matched": [
+              "ALLOWLIST_BLOCK",
+              "allowlist"
+            ],
+            "ok": true
+          },
+          "kill_switch_state": {
+            "matched": [
+              "KILL_SWITCH",
+              "kill_active",
+              "kill_armed"
+            ],
+            "ok": true
+          }
+        }
+      }
+    },
+    "a_drift": {
+      "axis": "a_drift",
+      "status": "SKIP",
+      "summary": "Not in this audit's axes_active list.",
+      "details": {}
+    },
+    "a_chain": {
+      "axis": "a_chain",
+      "status": "SKIP",
+      "summary": "Not in this audit's axes_active list.",
+      "details": {}
+    },
+    "a_bias": {
+      "axis": "a_bias",
+      "status": "SKIP",
+      "summary": "Not in this audit's axes_active list.",
+      "details": {}
+    }
+  },
+  "verdict": "PASS"
+}

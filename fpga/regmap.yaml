@@ -66,13 +66,13 @@ blocks:
         access: ro
         description: "Live system status — see fields."
         fields:
-          - name: ready          ; bit: 0  ; description: "Gate ready to accept orders."
-          - name: kill_active    ; bit: 1  ; description: "Kill switch is currently active (sticky)."
-          - name: rate_limited   ; bit: 2  ; description: "Last decision was rate-limited."
-          - name: pos_limited    ; bit: 3  ; description: "Last decision was position-limited."
-          - name: ff_blocked     ; bit: 4  ; description: "Last decision was fat-finger-blocked."
-          - name: allowlist_block; bit: 5  ; description: "Last decision was allowlist-blocked."
-          - name: chain_healthy  ; bit: 6  ; description: "Audit-chain hash sequence intact."
+          - { name: ready,           bit: 0, description: "Gate ready to accept orders." }
+          - { name: kill_active,     bit: 1, description: "Kill switch is currently active (sticky)." }
+          - { name: rate_limited,    bit: 2, description: "Last decision was rate-limited." }
+          - { name: pos_limited,     bit: 3, description: "Last decision was position-limited." }
+          - { name: ff_blocked,      bit: 4, description: "Last decision was fat-finger-blocked." }
+          - { name: allowlist_block, bit: 5, description: "Last decision was allowlist-blocked." }
+          - { name: chain_healthy,   bit: 6, description: "Audit-chain hash sequence intact." }
 
   # ==========================================================================
   # 0x0100 — RATE LIMITER
@@ -317,11 +317,13 @@ blocks:
         description: "Total allowlist-rejected orders since power-on."
 
   # ==========================================================================
-  # 0x0600 — AUDIT CHAIN
+  # 0x0700 — AUDIT CHAIN
   # Owner: risk_audit_log.sv
+  # (Shifted from 0x0600 → 0x0700 so it doesn't overlap symbol_allowlist@0x500
+  # which is sized 0x0200 to fit 64 4-byte slot registers + stats.)
   # ==========================================================================
   - name: audit_chain
-    base: 0x0600
+    base: 0x0700
     size: 0x0100
     owner: "risk_audit_log.sv"
     registers:
@@ -374,11 +376,12 @@ blocks:
         description: "Total decisions logged."
 
   # ==========================================================================
-  # 0x0700 — DECISION STATS (aggregate counters)
+  # 0x0800 — DECISION STATS (aggregate counters)
   # Owner: risk_gate.sv
+  # (Shifted from 0x0700 → 0x0800 to make room for audit_chain at 0x0700.)
   # ==========================================================================
   - name: decision_stats
-    base: 0x0700
+    base: 0x0800
     size: 0x0080
     owner: "risk_gate.sv"
     registers:

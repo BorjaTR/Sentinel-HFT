@@ -67,3 +67,8 @@ out/
 # by .github/workflows/synth-yosys.yml. No reason to version them.
 fpga/u55c/reports/yosys_ltp.txt
 fpga/u55c/reports/yosys_ltp.log
+
+# V-Floor regenerable corpora — too big to commit. Regenerate from seed:
+#   make verification/v_floor/regenerate
+# Determinism is verified against verification/v_floor/MANIFEST.sha256.
+verification/reports/v_floor/*.json
