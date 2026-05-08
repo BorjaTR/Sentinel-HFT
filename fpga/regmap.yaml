@@ -1,0 +1,444 @@
+# =============================================================================
+# Sentinel-HFT — Canonical FPGA Register Map
+# =============================================================================
+# Single source of truth for the FPGA control plane. The build flow MUST
+# codegen the C, Rust, and Python register-access layers from this file
+# (see scripts/codegen_regmap.py). Hand-edited headers are forbidden.
+#
+# Ownership: each register declares which RTL block owns its semantics.
+# Byte order is little-endian throughout. All addresses are byte offsets
+# from BAR0.
+#
+# Versioning: bump regmap_version on any layout-affecting change.
+# Adding registers at the end of an existing block bumps the patch.
+# Reordering or resizing fields bumps the minor.
+# Removing registers or changing access modes bumps the major.
+# =============================================================================
+
+regmap_version: "0.1.0"
+locked_at: "2026-05-08"
+endianness: "little"
+bar: 0
+
+# -----------------------------------------------------------------------------
+# Block layout (each block is 64 KB unless documented)
+# -----------------------------------------------------------------------------
+blocks:
+
+  # ==========================================================================
+  # 0x0000 — IDENTITY & STATUS
+  # Owner: sentinel_u55c_top.sv
+  # ==========================================================================
+  - name: identity
+    base: 0x0000
+    size: 0x0100
+    owner: "sentinel_u55c_top.sv"
+    registers:
+      - name: MAGIC
+        offset: 0x00
+        width: 32
+        access: ro
+        reset: 0x53484654   # 'SHFT' little-endian
+        description: "Sentinel-HFT magic number — host probes this to detect a Sentinel device."
+
+      - name: VERSION
+        offset: 0x04
+        width: 32
+        access: ro
+        reset: 0x00010000   # 0x00 MM mm pp = 0.1.0
+        description: "Bitstream semantic version (major.minor.patch in MSB-first nibbles)."
+
+      - name: BUILD_GIT_SHA
+        offset: 0x08
+        width: 32
+        access: ro
+        description: "Lower 32 bits of the git commit SHA at synth time."
+
+      - name: BUILD_TIMESTAMP
+        offset: 0x0C
+        width: 64
+        access: ro
+        description: "Unix timestamp of bitstream build (seconds)."
+
+      - name: STATUS
+        offset: 0x18
+        width: 32
+        access: ro
+        description: "Live system status — see fields."
+        fields:
+          - name: ready          ; bit: 0  ; description: "Gate ready to accept orders."
+          - name: kill_active    ; bit: 1  ; description: "Kill switch is currently active (sticky)."
+          - name: rate_limited   ; bit: 2  ; description: "Last decision was rate-limited."
+          - name: pos_limited    ; bit: 3  ; description: "Last decision was position-limited."
+          - name: ff_blocked     ; bit: 4  ; description: "Last decision was fat-finger-blocked."
+          - name: allowlist_block; bit: 5  ; description: "Last decision was allowlist-blocked."
+          - name: chain_healthy  ; bit: 6  ; description: "Audit-chain hash sequence intact."
+
+  # ==========================================================================
+  # 0x0100 — RATE LIMITER
+  # Owner: rate_limiter.sv
+  # ==========================================================================
+  - name: rate_limiter
+    base: 0x0100
+    size: 0x0080
+    owner: "rate_limiter.sv"
+    registers:
+      - name: CFG_MAX_TOKENS
+        offset: 0x00
+        width: 32
+        access: rw
+        reset: 0x00000400   # 1024 token bucket
+        description: "Token bucket capacity."
+
+      - name: CFG_REFILL_RATE
+        offset: 0x04
+        width: 32
+        access: rw
+        reset: 0x00000020   # 32 tokens per refill period
+        description: "Tokens added each refill period."
+
+      - name: CFG_REFILL_PERIOD
+        offset: 0x08
+        width: 16
+        access: rw
+        reset: 0x0064       # 100 cycles
+        description: "Cycles between refills."
+
+      - name: CFG_ENABLED
+        offset: 0x0A
+        width: 8
+        access: rw
+        reset: 0x01
+        description: "Enable bit (1=on)."
+
+      - name: STAT_TOKENS_LEFT
+        offset: 0x10
+        width: 32
+        access: ro
+        description: "Tokens currently in the bucket."
+
+      - name: STAT_REJECTED
+        offset: 0x14
+        width: 64
+        access: ro
+        description: "Total rate-rejected orders since power-on."
+
+  # ==========================================================================
+  # 0x0200 — POSITION LIMITER (aggregated; see ARCHITECTURE.md)
+  # Owner: position_limiter.sv
+  # ==========================================================================
+  - name: position_limiter
+    base: 0x0200
+    size: 0x0100
+    owner: "position_limiter.sv"
+    registers:
+      - name: CFG_MAX_LONG_QTY
+        offset: 0x00
+        width: 64
+        access: rw
+        description: "Maximum aggregated long quantity."
+
+      - name: CFG_MAX_SHORT_QTY
+        offset: 0x08
+        width: 64
+        access: rw
+        description: "Maximum aggregated short quantity."
+
+      - name: CFG_MAX_NOTIONAL
+        offset: 0x10
+        width: 64
+        access: rw
+        description: "Maximum aggregated gross notional."
+
+      - name: CFG_MAX_ORDER_QTY
+        offset: 0x18
+        width: 64
+        access: rw
+        description: "Maximum single-order quantity."
+
+      - name: CFG_ENABLED
+        offset: 0x20
+        width: 8
+        access: rw
+        reset: 0x01
+        description: "Enable bit (1=on)."
+
+      - name: STAT_LONG_QTY
+        offset: 0x30
+        width: 64
+        access: ro
+        description: "Current aggregated long quantity (from fills)."
+
+      - name: STAT_SHORT_QTY
+        offset: 0x38
+        width: 64
+        access: ro
+        description: "Current aggregated short quantity (from fills)."
+
+      - name: STAT_NOTIONAL
+        offset: 0x40
+        width: 64
+        access: ro
+        description: "Current aggregated gross notional."
+
+      - name: STAT_REJECTED
+        offset: 0x48
+        width: 64
+        access: ro
+        description: "Total position-rejected orders since power-on."
+
+  # ==========================================================================
+  # 0x0300 — KILL SWITCH
+  # Owner: kill_switch.sv
+  # ==========================================================================
+  - name: kill_switch
+    base: 0x0300
+    size: 0x0080
+    owner: "kill_switch.sv"
+    registers:
+      - name: CFG_ARMED
+        offset: 0x00
+        width: 8
+        access: rw
+        reset: 0x01
+        description: "Kill switch armed (1=on)."
+
+      - name: CFG_AUTO_ENABLED
+        offset: 0x01
+        width: 8
+        access: rw
+        reset: 0x00
+        description: "Automatic loss-threshold trigger enabled."
+
+      - name: CFG_LOSS_THRESHOLD
+        offset: 0x08
+        width: 64
+        access: rw
+        description: "P&L loss (signed) below which auto-kill fires."
+
+      - name: CMD_TRIGGER
+        offset: 0x10
+        width: 8
+        access: w1c
+        description: "Write 1 to manually trigger kill. Self-clearing."
+
+      - name: CMD_RESET
+        offset: 0x11
+        width: 8
+        access: w1c
+        description: "Write 1 to reset a tripped kill state. Self-clearing."
+
+      - name: STAT_TRIPPED
+        offset: 0x20
+        width: 8
+        access: ro
+        description: "1 if kill is currently tripped."
+
+      - name: STAT_TRIP_COUNT
+        offset: 0x24
+        width: 32
+        access: ro
+        description: "Lifetime trip count."
+
+      - name: STAT_BLOCKED
+        offset: 0x28
+        width: 64
+        access: ro
+        description: "Total orders blocked by kill switch."
+
+  # ==========================================================================
+  # 0x0400 — FAT FINGER BAND  (NEW for Phase 1; module to be added)
+  # Owner: fat_finger_band.sv
+  # ==========================================================================
+  - name: fat_finger_band
+    base: 0x0400
+    size: 0x0080
+    owner: "fat_finger_band.sv"
+    registers:
+      - name: CFG_ENABLED
+        offset: 0x00
+        width: 8
+        access: rw
+        reset: 0x01
+
+      - name: CFG_BAND_BPS
+        offset: 0x04
+        width: 16
+        access: rw
+        reset: 0x012C       # 300 bps = 3.00%
+        description: "Allowed band as basis points off the reference price."
+
+      - name: CFG_REF_PRICE
+        offset: 0x10
+        width: 64
+        access: rw
+        description: "Reference price for the band check (fixed-point, 8 decimals)."
+
+      - name: STAT_REJECTED
+        offset: 0x20
+        width: 64
+        access: ro
+        description: "Total fat-finger-rejected orders since power-on."
+
+  # ==========================================================================
+  # 0x0500 — SYMBOL ALLOWLIST  (NEW for Phase 1; module to be added)
+  # Owner: symbol_allowlist.sv
+  # ==========================================================================
+  - name: symbol_allowlist
+    base: 0x0500
+    size: 0x0200
+    owner: "symbol_allowlist.sv"
+    registers:
+      - name: CFG_ENABLED
+        offset: 0x00
+        width: 8
+        access: rw
+        reset: 0x01
+
+      - name: CFG_NUM_SLOTS
+        offset: 0x04
+        width: 16
+        access: ro
+        reset: 0x0040       # 64 slots
+        description: "Maximum allowlist entries supported."
+
+      - name: SLOT_SYMBOL_ID
+        offset: 0x10
+        width: 32
+        access: rw
+        array_len: 64
+        stride: 4
+        description: "Allowed symbol_id values. Zero entries are inactive."
+
+      - name: STAT_REJECTED
+        offset: 0x150
+        width: 64
+        access: ro
+        description: "Total allowlist-rejected orders since power-on."
+
+  # ==========================================================================
+  # 0x0600 — AUDIT CHAIN
+  # Owner: risk_audit_log.sv
+  # ==========================================================================
+  - name: audit_chain
+    base: 0x0600
+    size: 0x0100
+    owner: "risk_audit_log.sv"
+    registers:
+      - name: CFG_KEY_LO
+        offset: 0x00
+        width: 64
+        access: wo
+        description: "Lower 64 bits of the BLAKE2b key. Write-only."
+
+      - name: CFG_KEY_HI
+        offset: 0x08
+        width: 64
+        access: wo
+        description: "Upper 64 bits of the BLAKE2b key. Write-only."
+
+      - name: STAT_HEAD_HASH_0
+        offset: 0x20
+        width: 64
+        access: ro
+        description: "BLAKE2b head hash bits [63:0]."
+
+      - name: STAT_HEAD_HASH_1
+        offset: 0x28
+        width: 64
+        access: ro
+        description: "BLAKE2b head hash bits [127:64]."
+
+      - name: STAT_HEAD_HASH_2
+        offset: 0x30
+        width: 64
+        access: ro
+        description: "BLAKE2b head hash bits [191:128]."
+
+      - name: STAT_HEAD_HASH_3
+        offset: 0x38
+        width: 64
+        access: ro
+        description: "BLAKE2b head hash bits [255:192]."
+
+      - name: STAT_SEQ_NUM
+        offset: 0x40
+        width: 64
+        access: ro
+        description: "Monotonic chain sequence number."
+
+      - name: STAT_DECISIONS_LOGGED
+        offset: 0x48
+        width: 64
+        access: ro
+        description: "Total decisions logged."
+
+  # ==========================================================================
+  # 0x0700 — DECISION STATS (aggregate counters)
+  # Owner: risk_gate.sv
+  # ==========================================================================
+  - name: decision_stats
+    base: 0x0700
+    size: 0x0080
+    owner: "risk_gate.sv"
+    registers:
+      - name: STAT_TOTAL
+        offset: 0x00
+        width: 64
+        access: ro
+        description: "Total orders evaluated."
+
+      - name: STAT_PASSED
+        offset: 0x08
+        width: 64
+        access: ro
+        description: "Total orders accepted."
+
+      - name: STAT_REJECTED_RATE
+        offset: 0x10
+        width: 64
+        access: ro
+        description: "Rejected by rate limiter."
+
+      - name: STAT_REJECTED_POS
+        offset: 0x18
+        width: 64
+        access: ro
+        description: "Rejected by position limiter."
+
+      - name: STAT_REJECTED_KILL
+        offset: 0x20
+        width: 64
+        access: ro
+        description: "Rejected by kill switch."
+
+      - name: STAT_REJECTED_FF
+        offset: 0x28
+        width: 64
+        access: ro
+        description: "Rejected by fat-finger band."
+
+      - name: STAT_REJECTED_ALLOWLIST
+        offset: 0x30
+        width: 64
+        access: ro
+        description: "Rejected by symbol allowlist."
+
+      - name: STAT_LATENCY_NS_LAST
+        offset: 0x40
+        width: 32
+        access: ro
+        description: "Latency of last decision (ns)."
+
+# -----------------------------------------------------------------------------
+# Validation rules — what V-Contract enforces against this map
+# -----------------------------------------------------------------------------
+contract_rules:
+  - "Every register has a unique (block.base + offset) within its block."
+  - "No two blocks overlap."
+  - "All `wo` registers must read as 0."
+  - "All `ro` registers must reject writes (no side effect)."
+  - "All `w1c` registers self-clear after one cycle."
+  - "rw round-trip: write → readback → equal (with field-mask on multi-field regs)."
+  - "Reset values match the declared reset."
+  - "Reserved bits read as 0 and ignore writes."

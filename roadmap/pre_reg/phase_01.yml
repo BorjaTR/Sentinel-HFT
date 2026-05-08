@@ -1,0 +1,282 @@
+# =============================================================================
+# Phase 1 — FPGA Floor: pre-registration
+# =============================================================================
+# Locked: 2026-05-08
+# Author: Borja Tarazona
+# Status: ACTIVE (work in progress)
+#
+# Discipline: write the success criteria first, do the work after.
+# Mirrors the pre-registration pattern used by volat-agent's monthly audits.
+# This file MUST NOT be edited once locked, except via an explicit amendment
+# block at the bottom (with reason + date).
+# =============================================================================
+
+phase_id: 01
+phase_name: "FPGA Floor"
+locked_at: "2026-05-08T00:00:00Z"
+locked_by: "Borja Tarazona"
+production_lock: false
+posthoc: false
+
+# -----------------------------------------------------------------------------
+# Goal (one sentence)
+# -----------------------------------------------------------------------------
+goal: >
+  A working bitstream on AMD Alveo U55C that enforces pre-trade risk gates
+  with deterministic, sub-microsecond decision latency, and where the
+  shipped bitstream provably matches its behavioral specification.
+
+# -----------------------------------------------------------------------------
+# Targets (locked numbers — these do not slide without an amendment)
+# -----------------------------------------------------------------------------
+targets:
+  fpga_part: "xcu55c-fsvh2892-2L-e"
+  vivado_version_min: "2023.2"
+  yosys_version_min: "0.39"
+
+  # Clock target. 100 MHz is the existing Phase-0a value (conservative, lots
+  # of headroom). 250 MHz is the stretch target. Phase 1 ships at 100 MHz
+  # with a documented path to 250 MHz; the stretch is a Phase-2 concern.
+  fmax_target_mhz: 100
+  fmax_stretch_mhz: 250
+
+  # Decision latency = orders received → gate decision committed.
+  # Conservative; we'll publish observed p50/p99/p99.99 once measured.
+  latency_decision_ns_p99_max: 1000   # 1 µs at 100 MHz target
+  latency_decision_ns_p9999_max: 1500
+
+  # Bitstream reproducibility. SHA-256 of bit/nky must be deterministic
+  # for a given (commit, vivado_version) pair.
+  bitstream_reproducibility: "byte-identical for fixed (commit, toolchain)"
+
+# -----------------------------------------------------------------------------
+# Scope: what's IN Phase 1
+# -----------------------------------------------------------------------------
+scope_in:
+  rtl_modules:
+    - rtl/risk_pkg.sv            # types + constants
+    - rtl/risk_gate.sv           # main gate (composes the rules below)
+    - rtl/position_limiter.sv    # per-symbol position cap
+    - rtl/rate_limiter.sv        # token-bucket order-rate cap
+    - rtl/kill_switch.sv         # kill state + recovery
+    - rtl/risk_audit_log.sv      # BLAKE2b-chained decision log
+    - rtl/sentinel_shell_v12.sv  # gate-shell wrapper
+    - rtl/sentinel_sva.sv        # SVA assertions
+
+  rules_enforced:
+    - notional_cap_per_order
+    - notional_cap_aggregated_rolling   # (amended 2026-05-08, see amendments)
+    - position_cap_aggregated           # (amended 2026-05-08, see amendments)
+    - order_rate_cap
+    - fat_finger_price_band
+    - symbol_allowlist
+    - kill_switch_state
+
+  artifacts:
+    - fpga/regmap.yaml           # canonical register map (NEW in P1)
+    - fpga/u55c/sentinel_u55c_top.sv
+    - fpga/u55c/constraints/sentinel_u55c.xdc
+    - fpga/u55c/scripts/build.tcl
+    - fpga/u55c/reports/timing_report.txt   # generated, must be checked in
+    - fpga/bitstreams/sentinel_v0.1.bit     # locked deliverable
+    - sentinel_hft/golden/risk_gate.py      # NEW: behavioral golden model
+    - docs/fpga/ARCHITECTURE.md             # NEW: block diagram + flow
+    - docs/fpga/TRACEABILITY.md             # NEW: spec → RTL → test matrix
+
+# -----------------------------------------------------------------------------
+# Scope: what's OUT of Phase 1
+# -----------------------------------------------------------------------------
+scope_out:
+  - "Wire-protocol adapter (FIX 4.4) — Phase 2."
+  - "Failover and state replication — Phase 3."
+  - "Policy / config plane — Phase 4."
+  - "Audit chain persistence with WORM storage — Phase 5."
+  - "ITCH/OUCH or any second wire protocol — Phase 16+ backlog."
+  - "Bitstream reproducibility across DIFFERENT Vivado versions."
+  - "Hardware-backed signing / HSM."
+
+# -----------------------------------------------------------------------------
+# V-Gates (verification axes — must pass before phase closes)
+# -----------------------------------------------------------------------------
+v_gates:
+  v_floor:
+    description: "Gate decision matches behavioral golden on 10^6 random orders."
+    method: |
+      Generate 10^6 pseudo-random orders (seeded). Run through golden model.
+      Run same seed through RTL sim (Verilator). Compare decision + reject
+      reason byte-by-byte. Zero divergence allowed.
+    pass_threshold: "0 mismatches across 10^6 orders, 5 distinct seeds."
+    kill_threshold: "Any mismatch on the locked seed set."
+    artifact: "verification/reports/v_floor_phase01.json"
+
+  v_mutation:
+    description: "Mutation testing — every RTL mutation killed by ≥1 test."
+    method: |
+      Use a SystemVerilog mutation tool (TBD: rolling our own mutation
+      injector seeded into the Verilator flow). Flip operators, swap
+      signals, break conditionals. Re-run sim. Surviving mutations must
+      be either killed or explicitly justified in writing.
+    pass_threshold: "Mutation survival rate ≤ 5% with each survivor justified."
+    kill_threshold: "Any unjustified survivor."
+    artifact: "verification/reports/v_mutation_phase01.json"
+
+  v_metamorphic:
+    description: "Symmetric inputs produce symmetric outputs."
+    method: |
+      For every test order, generate its 'mirror' (e.g., long↔short, scale
+      notional by k, rotate symbol). Assert the gate's decision behaves
+      according to the documented symmetry.
+    pass_threshold: "100% of metamorphic relations hold across 10^5 pairs."
+    kill_threshold: "Any relation violated outside the documented exceptions."
+    artifact: "verification/reports/v_metamorphic_phase01.json"
+
+  v_parity:
+    description: "RTL sim ≡ gate-level sim ≡ on-FPGA execution."
+    method: |
+      Run the same 10^5 orders through:
+        (a) Verilator behavioral sim
+        (b) Vivado post-synth gate-level sim
+        (c) On-FPGA via PCIe XDMA (or a fixture replay if no card available)
+      All three must produce identical decisions and identical reject
+      reasons. If no card is available, skip (c) and document.
+    pass_threshold: "Zero divergence across the engines that ran."
+    kill_threshold: "Any divergence."
+    artifact: "verification/reports/v_parity_phase01.json"
+
+  v_contract:
+    description: "Boundary contract tests for register-map and audit-log iface."
+    method: |
+      Property-test every readable register against regmap.yaml. Every
+      writable register: write → readback → assert equal (with masking).
+      Every audit-log entry: write → BLAKE2b chain advance → verify.
+    pass_threshold: "100% of registers covered. Zero contract violations."
+    kill_threshold: "Any uncovered register or contract violation."
+    artifact: "verification/reports/v_contract_phase01.json"
+
+  v_tamper:
+    description: "Audit-log on-FPGA chain detects tampering."
+    method: |
+      Inject 100 tamper attempts: bit-flip, segment swap, replay,
+      truncation, hash-with-wrong-key. RTL chain logic must reject all.
+    pass_threshold: "100/100 tamper attempts detected."
+    kill_threshold: "Any tamper attempt undetected."
+    artifact: "verification/reports/v_tamper_phase01.json"
+
+# -----------------------------------------------------------------------------
+# A-Gates (audit axes — what the audit system will verify post-phase)
+# -----------------------------------------------------------------------------
+a_gates:
+  a_spec:
+    description: "Shipped bitstream matches the locked spec."
+    method: |
+      Independent re-synthesis from a clean checkout (different machine,
+      same Vivado version) must produce a bitstream with identical SHA-256.
+      Spec → RTL traceability matrix replayed: every spec clause maps to
+      ≥1 RTL block + ≥1 test, and the tests pass.
+    pass_threshold: "Bitstream SHA matches OR documented-and-justified divergence; 100% traceability."
+    kill_threshold: "Undocumented bitstream divergence OR any spec clause without a test."
+    artifact: "audit_system/reports/a_spec_phase01.json"
+
+  a_forward:
+    description: "Replay last period's flow, verify gate decisions match expected."
+    method: "Phase 1 does not have 'last period' flow. This axis is INACTIVE for Phase 1; activates from Phase 8."
+    pass_threshold: "N/A (inactive)"
+    kill_threshold: "N/A (inactive)"
+    artifact: null
+
+  a_coverage:
+    description: "Policy clauses exercised by tests."
+    method: "Phase 1 covers the 7 hard-wired rules. Coverage = (tested clauses) / (rules_enforced)."
+    pass_threshold: "100% of rules_enforced exercised by ≥1 test."
+    kill_threshold: "Any rule without a test."
+    artifact: "audit_system/reports/a_coverage_phase01.json"
+
+  a_drift:
+    description: "Latency and reject-rate distributions in band."
+    method: "Compare measured latency histograms vs targets.latency_decision_ns_*."
+    pass_threshold: "p99 ≤ 1000 ns; p99.99 ≤ 1500 ns at 100 MHz."
+    kill_threshold: "Any band breach."
+    artifact: "audit_system/reports/a_drift_phase01.json"
+
+  a_chain:
+    description: "Audit-chain end-to-end integrity."
+    method: |
+      Run a representative session end-to-end. Verify every decision is
+      logged. Recompute BLAKE2b chain off-line; compare to on-chip hash.
+      Sample at least 10^5 entries.
+    pass_threshold: "All chain segments verify; no gaps in sequence numbers."
+    kill_threshold: "Any chain segment fails verification or sequence gap."
+    artifact: "audit_system/reports/a_chain_phase01.json"
+
+  a_bias:
+    description: "Gate behaves consistently across cohorts."
+    method: |
+      Bucket the 10^6-order V-Floor corpus by symbol, side, time-of-day.
+      Compute reject rate per bucket. Bonferroni-corrected χ² test
+      against the expected rate per the policy. Flag deviations >3σ.
+    pass_threshold: "No statistically significant deviation per cohort under the policy."
+    kill_threshold: "Any deviation >3σ that is not explained by the policy."
+    artifact: "audit_system/reports/a_bias_phase01.json"
+
+# -----------------------------------------------------------------------------
+# External review
+# -----------------------------------------------------------------------------
+external_review:
+  required_for:
+    - "rtl/risk_audit_log.sv (BLAKE2b chain logic)"
+  process: "One independent reviewer must sign off via PR comment before phase closes."
+  status: "PENDING (no reviewer yet identified)"
+
+# -----------------------------------------------------------------------------
+# Ship criterion (all must be true)
+# -----------------------------------------------------------------------------
+ship_criterion:
+  - "All 6 V-Gates: PASS."
+  - "All ACTIVE A-Gates (a_spec, a_coverage, a_drift, a_chain, a_bias): PASS."
+  - "Bitstream loaded successfully (or documented-as-skipped if no card)."
+  - "Timing report shows all paths met at fmax_target_mhz."
+  - "Traceability matrix complete — every rule in rules_enforced has ≥1 RTL block and ≥1 test."
+  - "Phase-close report at roadmap/reports/phase_01_close.md."
+
+# -----------------------------------------------------------------------------
+# Kill criterion (any one triggers a stop)
+# -----------------------------------------------------------------------------
+kill_criterion:
+  - "Timing closure unachievable at 100 MHz after 4 weeks of attempts."
+  - "Mutation testing shows survival rate >20% with no path to fix."
+  - "Cross-engine parity divergence with no diagnosable cause."
+  - "BLAKE2b chain logic fails external review with no path to fix."
+
+# -----------------------------------------------------------------------------
+# Risks (acknowledged at lock time)
+# -----------------------------------------------------------------------------
+risks:
+  - id: R1
+    description: "U55C card may not be physically available — V-Parity (c) skipped."
+    mitigation: "Document. V-Parity (a) ≡ (b) is sufficient to pass V-Parity for Phase 1."
+  - id: R2
+    description: "Vivado license may expire / not be available."
+    mitigation: "Yosys path covers synth; Vivado needed for P&R + bitstream. Free WebPack edition may suffice for U55C — verify."
+  - id: R3
+    description: "Mutation testing tool for SystemVerilog is not as mature as for software."
+    mitigation: "Roll a minimal mutation injector (operator-flip + signal-substitution) ourselves. Document its limits."
+  - id: R4
+    description: "Single reviewer dependency on external_review."
+    mitigation: "Acceptable to use an LLM-based code review as a first pass, with the reviewer's identity and prompt logged."
+
+# -----------------------------------------------------------------------------
+# Amendments (only way to change locked targets)
+# -----------------------------------------------------------------------------
+amendments:
+  - id: AM-01
+    date: "2026-05-08"
+    reason: >
+      G1 from PHASE_01_INVENTORY.md — current position_limiter.sv tracks a
+      single global net position, not per-symbol. Per-symbol slicing requires
+      a BRAM-backed position table that is real engineering work and is not
+      essential for a v1.0 portfolio piece. Keep aggregated; add per-symbol
+      to Phase 16+ backlog.
+    change: >
+      rules_enforced.position_cap_per_symbol → position_cap_aggregated
+      rules_enforced.notional_cap_per_symbol_rolling → notional_cap_aggregated_rolling
+    impact: "No change to V-gate or A-gate thresholds. Documentation must reflect aggregation."
