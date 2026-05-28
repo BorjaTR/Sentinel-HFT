@@ -1,0 +1,25 @@
+schema_version: 1
+name: "example-2026-05-08"
+description: "Example Phase-4 policy. Tighten before any real use."
+rate:
+  max_tokens: 1024
+  refill_rate: 32
+  refill_period_cycles: 100
+  enabled: true
+position:
+  max_long_qty: 10000000
+  max_short_qty: 10000000
+  max_notional: 100000000000000
+  max_order_qty: 1000000
+  enabled: true
+kill_switch:
+  armed: true
+  auto_enabled: false
+  loss_threshold: -1000000000000
+fat_finger:
+  enabled: true
+  band_bps: 300
+  ref_price_fp8: 0
+allowlist:
+  enabled: true
+  symbols: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
