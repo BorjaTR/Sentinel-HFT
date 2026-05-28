@@ -1,0 +1,30 @@
+# FCA SYSC 19F.6 — Algorithmic trading risk-management evidence template.
+# Citations reference FCA Handbook SYSC 19F.6 (UK MiFID II onshoring).
+
+regulator: FCA_SYSC_19F6
+title: "FCA SYSC 19F.6 — algorithmic trading systems risk evidence"
+clauses:
+  - id: "SYSC19F6.2"
+    title: "Trading system controls — pre-trade"
+    description: |
+      SYSC 19F.6.2 R: pre-trade controls (price collars, max order
+      values, max order volumes). Evidence: chain slice + counters.
+    required_evidence:
+      - chain_slice
+      - counter
+
+  - id: "SYSC19F6.3"
+    title: "Kill functionality"
+    description: |
+      SYSC 19F.6.3 R: kill switch + ability to immediately cancel
+      orders. Evidence: kill_switch drill.
+    required_evidence:
+      - drill_result
+
+  - id: "SYSC19F6.5"
+    title: "Annual self-assessment"
+    description: |
+      SYSC 19F.6.5 R: annual self-assessment of controls. Evidence:
+      full chain slice (auditor verifies independently).
+    required_evidence:
+      - chain_slice

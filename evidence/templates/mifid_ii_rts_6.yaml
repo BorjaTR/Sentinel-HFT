@@ -1,0 +1,39 @@
+# MiFID II RTS 6 — Algorithmic trading & DEA risk-control evidence template.
+# Citations reference Commission Delegated Regulation (EU) 2017/589.
+
+regulator: MIFID_II_RTS_6
+title: "MiFID II RTS 6 — algorithmic trading risk-control evidence"
+clauses:
+  - id: "RTS6.1"
+    title: "Pre-trade risk controls — automated"
+    description: |
+      Article 17(1) MiFID II + RTS 6 Article 13: pre-trade limits, kill
+      functionality, message-rate caps. Evidence: chain slice over the
+      period + per-rule counters.
+    required_evidence:
+      - chain_slice
+      - counter
+
+  - id: "RTS6.2"
+    title: "Post-trade controls — monitoring"
+    description: |
+      RTS 6 Article 17: real-time monitoring of order/position. Evidence:
+      counters per period.
+    required_evidence:
+      - counter
+
+  - id: "RTS6.3"
+    title: "Kill functionality — testing"
+    description: |
+      RTS 6 Article 12: ability to immediately cancel all unexecuted
+      orders. Evidence: kill-switch drill result.
+    required_evidence:
+      - drill_result
+
+  - id: "RTS6.5"
+    title: "Self-assessment + annual validation"
+    description: |
+      RTS 6 Article 9: annual self-assessment that controls are adequate.
+      Evidence: full chain slice (auditor verifies independently).
+    required_evidence:
+      - chain_slice

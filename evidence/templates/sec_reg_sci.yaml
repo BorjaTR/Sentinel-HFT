@@ -1,0 +1,33 @@
+# SEC Reg SCI — Systems Compliance and Integrity evidence template.
+# Citations reference 17 CFR 242.1000–1007.
+
+regulator: SEC_REG_SCI
+title: "SEC Reg SCI — SCI systems integrity evidence"
+clauses:
+  - id: "SCI.1001a"
+    title: "Capacity, integrity, resiliency, availability, security"
+    description: |
+      Reg SCI 1001(a): policies and procedures reasonably designed to
+      ensure SCI systems have levels of capacity, integrity, resiliency,
+      availability, and security appropriate to their function.
+    required_evidence:
+      - chain_slice
+      - counter
+
+  - id: "SCI.1001b"
+    title: "Compliance with relevant laws and regulations"
+    description: |
+      Reg SCI 1001(b): SCI systems operate in a manner that complies
+      with the SEA. Evidence: chain slice + drill results for
+      kill_switch + market_data_loss scenarios.
+    required_evidence:
+      - chain_slice
+      - drill_result
+
+  - id: "SCI.1003"
+    title: "SCI events — record-keeping"
+    description: |
+      Reg SCI 1003: maintain records of SCI events. Evidence: full
+      audit-chain slice over the period.
+    required_evidence:
+      - chain_slice
