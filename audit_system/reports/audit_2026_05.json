@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "period": "2026-05",
-  "commit": "1966d00bebe1",
-  "ran_at": "2026-05-08T06:37:08.558798Z",
+  "commit": "a94829c2271d",
+  "ran_at": "2026-05-08T08:00:38.151956Z",
   "axes": {
     "a_spec": {
       "axis": "a_spec",
